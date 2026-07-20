@@ -1,0 +1,22 @@
+# wxcl-v2 部署配置增量
+# 添加到 /etc/nginx/sites-enabled/ 中的 wxcl.nzyy.cc server block 内
+
+# 在 location /api/ 之前添加：
+location /v2 {
+    proxy_pass http://127.0.0.1:3006;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+}
+
+# 如果没有 /v2/api/ 路由匹配，也需要添加：
+location /v2/api/ {
+    proxy_pass http://127.0.0.1:3006;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+}
