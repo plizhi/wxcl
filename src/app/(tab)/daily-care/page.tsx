@@ -2,16 +2,17 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { dailyCareApi, DailyCareReport, DailyCareRecord } from '@/lib/api';
+import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/components/ui/toast';
 
 export default function DailyCarePage() {
   const router = useRouter();
   const { toast } = useToast();
+  const { user } = useAuth();
   const [content, setContent] = useState('');
   const [loading, setLoading] = useState(false);
-  const [report, setReport] = useState<DailyCareReport | null>(null);
-  const [records, setRecords] = useState<DailyCareRecord[]>([]);
+  const [report, setReport] = useState<any>(null);
+  const [records, setRecords] = useState<any[]>([]);
   const [showHistory, setShowHistory] = useState(false);
 
   useEffect(() => {
@@ -20,8 +21,15 @@ export default function DailyCarePage() {
 
   async function loadRecords() {
     try {
-      const data = await dailyCareApi.getRecords(0, 5);
-      setRecords(data.records || []);
+      const res = await fetch('/v2/api/daily-care/records', {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token') || ''}`,
+        },
+      });
+      const data = await res.json();
+      if (data.records) {
+        setRecords(data.records);
+      }
     } catch (e) {
       console.error('加载记录失败', e);
     }
@@ -34,10 +42,20 @@ export default function DailyCarePage() {
     setLoading(true);
     setReport(null);
     try {
-      const result = await dailyCareApi.analyze(content.trim());
-      setReport(result);
-      await loadRecords();
-      toast('记录成功', 'success');
+      const res = await fetch('/v2/api/daily-care/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: content.trim() }),
+      });
+
+      const data = await res.json();
+      if (data.growth_summary || data.strengths) {
+        setReport(data);
+        await loadRecords();
+        toast('记录成功', 'success');
+      } else {
+        toast('记录失败', 'error');
+      }
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : String(error);
       toast(msg || '提交失败', 'error');
@@ -46,11 +64,18 @@ export default function DailyCarePage() {
     }
   }
 
-  async function loadRecordReport(id: number) {
+  async function loadReport(id: number) {
     try {
-      const result = await dailyCareApi.getReport(id);
-      setReport(result);
-      setShowHistory(false);
+      const res = await fetch(`/v2/api/daily-care/report/${id}`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token') || ''}`,
+        },
+      });
+      const data = await res.json();
+      if (data.report) {
+        setReport(data.report);
+        setShowHistory(false);
+      }
     } catch (e) {
       console.error('加载报告失败', e);
     }
@@ -85,7 +110,7 @@ export default function DailyCarePage() {
               {records.map(record => (
                 <button
                   key={record.id}
-                  onClick={() => loadRecordReport(record.id)}
+                  onClick={() => loadReport(record.id)}
                   className="w-full text-left p-3 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors"
                 >
                   <p className="text-sm text-gray-600 line-clamp-2">{record.content}</p>
@@ -109,7 +134,7 @@ export default function DailyCarePage() {
             <div className="mb-4">
               <h4 className="text-sm font-medium text-amber-600 mb-2">✨ 今日亮点</h4>
               <div className="space-y-1">
-                {report.strengths.map((s, i) => (
+                {report.strengths.map((s: string, i: number) => (
                   <p key={i} className="text-sm text-gray-700">{s}</p>
                 ))}
               </div>
@@ -117,33 +142,27 @@ export default function DailyCarePage() {
           )}
 
           {/* 机会窗口 */}
-          {(report.opportunity_axis1 || report.opportunity_axis2) && (
+          {report.opportunity_axis1 && (
             <div className="mb-4">
               <h4 className="text-sm font-medium text-purple-600 mb-2">💡 机会窗口</h4>
-              {report.opportunity_axis1 && (
-                <p className="text-sm text-gray-700 mb-1">
-                  <span className="font-medium">{report.opportunity_axis1.dimension}:</span> {report.opportunity_axis1.suggestion}
-                </p>
-              )}
-              {report.opportunity_axis2 && (
-                <p className="text-sm text-gray-700">
-                  <span className="font-medium">{report.opportunity_axis2.element}:</span> {report.opportunity_axis2.suggestion}
-                </p>
-              )}
+              <p className="text-sm text-gray-700">
+                <span className="font-medium">{report.opportunity_axis1.dimension}:</span> {report.opportunity_axis1.suggestion}
+              </p>
+            </div>
+          )}
+
+          {report.opportunity_axis2 && (
+            <div className="mb-4">
+              <p className="text-sm text-gray-700">
+                <span className="font-medium">{report.opportunity_axis2.element}:</span> {report.opportunity_axis2.suggestion}
+              </p>
             </div>
           )}
 
           {/* 一句话建议 */}
           {report.advice && (
-            <div className="bg-green-50 rounded-lg p-3 mb-4">
+            <div className="bg-green-50 rounded-lg p-3">
               <p className="text-sm text-green-800 italic">{report.advice}</p>
-            </div>
-          )}
-
-          {/* 追问 */}
-          {report.reflection_prompt && (
-            <div className="bg-gray-50 rounded-lg p-3">
-              <p className="text-sm text-gray-600">{report.reflection_prompt}</p>
             </div>
           )}
         </div>
@@ -155,7 +174,7 @@ export default function DailyCarePage() {
           <p className="text-sm text-gray-500 mb-2">今天和孩子发生了什么？</p>
           <textarea
             value={content}
-            onChange={e => setContent(e.target.value)}
+            onChange={(e) => setContent(e.target.value)}
             placeholder="不需要完整，只要真实..."
             maxLength={1000}
             className="w-full p-3 rounded-lg border border-gray-200 focus:border-amber-400 focus:ring-0 outline-none resize-none min-h-32"

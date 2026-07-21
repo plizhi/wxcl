@@ -7,7 +7,7 @@ import { useAuth } from '@/context/AuthContext';
 
 const tabs = [
   { href: '/', label: '陪伴&观察', emoji: '🌿' },
-  { href: '/questions', label: '望杏阁', emoji: '💧' },
+  { href: '/questions', label: '压力吐槽', emoji: '💬' },
   { href: '/profile', label: '我的', emoji: '👤' },
 ];
 

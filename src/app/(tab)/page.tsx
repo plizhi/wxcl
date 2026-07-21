@@ -130,7 +130,7 @@ export default function HomePage() {
           className="w-full flex items-center justify-center gap-2 py-3 border border-purple-200 rounded-xl text-purple-600 hover:bg-purple-50 transition-colors mb-6"
         >
           <span>💬</span>
-          <span className="text-sm">压力吐槽 / AI 建议</span>
+          <span className="text-sm">压力吐槽 / 专业建议</span>
         </button>
 
         {/* 登出按钮 */}
