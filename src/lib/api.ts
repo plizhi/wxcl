@@ -128,6 +128,15 @@ export const dailyCareApi = {
       method: "POST",
       body: JSON.stringify(feedback),
     }),
+  getComprehensive: (childId?: string, startDate?: string, endDate?: string) => {
+    const params = new URLSearchParams();
+    if (startDate) params.set("startDate", startDate);
+    if (endDate) params.set("endDate", endDate);
+    const qs = params.toString();
+    return request<DailyCareReport>(
+      "/daily-care/comprehensive" + (qs ? "?" + qs : "")
+    );
+  },
 };
 
 // Profile API
