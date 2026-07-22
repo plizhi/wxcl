@@ -246,4 +246,8 @@ export const nourishmentApi = {
     ),
   generateReport: (data: { childId?: string; periodType: string }) =>
     request<{ report: NourishmentReport }>('/nourishment/reports', { method: 'POST', body: JSON.stringify(data) }),
+  extractFromRecords: (limit = 10) =>
+    request<{ extractions: { fact: string; feeling: string }[]; savedCount: number; processedRecords: number }>(
+      '/nourishment/extract', { method: 'POST', body: JSON.stringify({ limit }) }
+    ),
 };
