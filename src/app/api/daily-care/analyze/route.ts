@@ -41,6 +41,38 @@ const SYSTEM_PROMPTS = {
 }
 
 禁止说教。禁止空洞的"你做得很好"。`,
+
+  venting: `你是「内在结构养育」顾问。家长倾诉了一个困扰，请给予专业理解和回应。
+
+【内在结构养育的核心原则】
+1. 孩子的问题不是单纯"行为问题"，是身心结构在特定经历下的综合呈现
+2. 从"改行为"转向"看结构"——先问"他在回避什么"
+3. 理解孩子的身体/情绪信号，不要急于给方法
+4. 先帮孩子识别和命名情感，才能进一步调节情感
+5. 青春期是自我整合期——给空间，不是给答案
+6. 孩子的"问题行为"可能是适应性的生存策略
+7. 养育的目标不是让孩子完美，而是让孩子活出符合自己本性的真实生活
+8. 给孩子校正性情感体验——"你提需求是被允许的"，比讲道理更重要
+9. 镜映和生理满足同等重要——孩子需要被"看见"
+
+请根据家长描述的情况，给出：
+
+1. 理解（understanding）：用一两句话准确描述你理解的家长处境和感受
+2. 分析（analysis）：分析问题的关键所在和家长/孩子的心理需求
+3. 建议（suggestions）：给出2-3个具体、可操作的融入内在结构养育理念的建议
+4. 一句话总结（summary）：温暖有力的一句话
+
+用 JSON 格式返回：
+{
+  "understanding": "理解描述",
+  "analysis": "分析描述",
+  "suggestions": ["建议1", "建议2", "建议3"],
+  "summary": "一句话总结",
+  "strengths": ["亮点1", "亮点2"],
+  "advice": "一句话建议"
+}
+
+禁止说教。禁止空洞的"你做得很好"。禁止直接给答案。`,
 };
 
 function getUserId(req: NextRequest): string | null {
@@ -52,9 +84,7 @@ function getUserId(req: NextRequest): string | null {
 // 获取或创建默认孩子记录
 async function getOrCreateDefaultChild(userId: string | null): Promise<string | null> {
   try {
-    // 如果 userId 无效，使用默认孩子的固定 UUID
     if (!userId) {
-      // 返回或创建默认孩子（ID 硬编码）
       const defaultChildId = '00000000-0000-0000-0000-000000000001';
       const existing = await queryOne(
         `SELECT id FROM children WHERE id = $1`,
@@ -70,7 +100,6 @@ async function getOrCreateDefaultChild(userId: string | null): Promise<string | 
       return defaultChildId;
     }
 
-    // 先尝试获取用户的第一个孩子
     const existingChild = await queryOne(
       `SELECT id FROM children WHERE user_id = $1 LIMIT 1`,
       [userId]
@@ -80,7 +109,6 @@ async function getOrCreateDefaultChild(userId: string | null): Promise<string | 
       return existingChild.id;
     }
 
-    // 如果没有孩子，创建一个默认的
     const newChild = await queryOne(
       `INSERT INTO children (user_id, name, gender, birth_date)
        VALUES ($1, '我的孩子', 'boy', '2015-01-01')
@@ -97,7 +125,7 @@ async function getOrCreateDefaultChild(userId: string | null): Promise<string | 
 
 export async function POST(req: NextRequest) {
   try {
-    const { content, recordDate, childId: requestedChildId } = await req.json();
+    const { content, childId: requestedChildId, intent = 'daily' } = await req.json();
 
     if (!content) {
       return NextResponse.json({ error: "content is required" }, { status: 400 });
@@ -105,7 +133,6 @@ export async function POST(req: NextRequest) {
 
     const userId = getUserId(req);
 
-    // 获取或创建默认孩子
     let childId = requestedChildId;
     if (!childId && userId) {
       childId = await getOrCreateDefaultChild(userId);
@@ -116,6 +143,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "服务未配置" }, { status: 500 });
     }
 
+    // 根据 intent 选择 prompt
+    const systemPrompt = SYSTEM_PROMPTS[intent] || SYSTEM_PROMPTS.analyze;
+
     const response = await fetch("https://api.deepseek.com/chat/completions", {
       method: "POST",
       headers: {
@@ -125,7 +155,7 @@ export async function POST(req: NextRequest) {
       body: JSON.stringify({
         model: "deepseek-chat",
         messages: [
-          { role: "system", content: SYSTEM_PROMPTS.analyze },
+          { role: "system", content: systemPrompt },
           { role: "user", content: content },
         ],
         max_tokens: 1000,
@@ -160,9 +190,9 @@ export async function POST(req: NextRequest) {
       try {
         const result = await query(
           `INSERT INTO records (child_id, content, reply, intent, created_at)
-           VALUES ($1, $2, $3, 'daily', NOW())
+           VALUES ($1, $2, $3, $4, NOW())
            RETURNING id`,
-          [childId, content, JSON.stringify(report)]
+          [childId, content, JSON.stringify(report), intent]
         );
         recordId = result[0]?.id;
       } catch (dbErr) {
@@ -173,6 +203,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       ...report,
       recordId,
+      intent,
       touchPoint: "",
       thinkingShift: "",
       plannedAction: "",

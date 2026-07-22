@@ -1,59 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { useToast } from '@/components/ui/toast';
-import { useAuth } from '@/context/AuthContext';
-
-const PROMPTS: Record<string, string> = {
-  question: `你是「内在结构养育」顾问。请根据用户描述的情况，按以下结构给出专业建议：
-
-【理解】用一两句话准确描述你理解的用户处境和感受
-【分析】分析问题的关键所在和孩子/家长的心理需求
-【建议】给出2-3个具体、可操作的建议，融入内在结构养育的理念
-【收尾】用一句温暖的话结束
-
-内在结构养育的核心原则：
-1. 孩子的问题不是单纯"行为问题"，是身心结构在特定经历下的综合呈现
-2. 从"改行为"转向"看结构"——先问"他在回避什么"
-3. 理解孩子的身体/情绪信号，不要急于给方法
-4. 先帮孩子识别和命名情感，才能进一步调节情感
-5. 青春期是自我整合期——给空间，不是给答案
-6. 孩子的"问题行为"可能是适应性的生存策略
-7. 养育的目标不是让孩子完美，而是让孩子活出符合自己本性的真实生活
-8. 给孩子校正性情感体验——"你提需求是被允许的"，比讲道理更重要
-9. 镜映和生理满足同等重要——孩子需要被"看见"
-
-禁止说教。禁止空洞的"你做得很好"。`,
-  chat: `你是「内在结构养育」顾问。用户分享了一个困扰或心情，请给予理解和回应。融入内在结构养育的理念，温暖而专业。禁止说教。`,
-};
-
-function classify(text: string): "question" | "chat" {
-  if (text.includes("？") || text.includes("怎么办") || text.includes("为什么")) return "question";
-  return "chat";
-}
-
-async function callAI(text: string, parentRole?: string) {
-  const intent = classify(text);
-  let systemPrompt = PROMPTS[intent];
-
-  // 添加用户身份信息到 prompt
-  if (parentRole && intent === 'question') {
-    const roleText = parentRole === 'father' ? '爸爸' : '妈妈';
-    systemPrompt = `${systemPrompt}\n\n用户身份是${roleText}，请在回复中用这个称谓称呼用户。`;
-  }
-
-  const res = await fetch("/v2/api/chat", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ message: text, intent, systemPrompt }),
-  });
-
-  if (!res.ok) return "服务暂时不可用，请稍后再试。";
-
-  const data = await res.json();
-  return data.reply;
-}
 
 const SCENE_TAGS = [
   { value: 'emotion', label: '情绪', emoji: '😢' },
@@ -65,24 +13,32 @@ const SCENE_TAGS = [
 ];
 
 export default function QuestionsPage() {
-  const router = useRouter();
   const { toast } = useToast();
-  const { user } = useAuth();
   const [content, setContent] = useState('');
   const [sceneTag, setSceneTag] = useState('daily');
   const [loading, setLoading] = useState(false);
-  const [reply, setReply] = useState('');
+  const [report, setReport] = useState<any>(null);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!content.trim()) return;
 
     setLoading(true);
-    setReply('');
+    setReport(null);
     try {
-      const result = await callAI(content.trim(), user?.parentRole);
-      setReply(result);
-      toast('提交成功', 'success');
+      const res = await fetch('/v2/api/daily-care/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: content.trim(), intent: 'venting' }),
+      });
+
+      const data = await res.json();
+      if (data.growth_summary || data.understanding || data.advice) {
+        setReport(data);
+        toast('记录成功', 'success');
+      } else {
+        toast('记录失败', 'error');
+      }
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : String(error);
       toast(msg || '提交失败', 'error');
@@ -92,7 +48,7 @@ export default function QuestionsPage() {
   }
 
   return (
-    <div className="flex flex-col min-h-screen bg-gradient-to-b from-purple-50 to-white">
+    <div className="flex flex-col min-h-screen bg-gradient-to-b from-purple-50 to-white pb-20">
       {/* 顶部导航 */}
       <div className="sticky top-0 bg-white/90 backdrop-blur z-10 border-b border-gray-100">
         <div className="flex items-center gap-4 px-4 h-14">
@@ -121,11 +77,58 @@ export default function QuestionsPage() {
         </div>
       </div>
 
-      {/* 压力吐槽回应 */}
-      {reply && (
-        <div className="mx-4 mb-4 bg-white rounded-xl p-5 shadow-sm">
-          <h3 className="font-medium text-purple-600 mb-3">💬 压力吐槽回应</h3>
-          <p className="text-gray-700 whitespace-pre-wrap">{reply}</p>
+      {/* 结构化报告展示 */}
+      {report && (
+        <div className="mx-4 mb-4 space-y-4">
+          {/* 理解 */}
+          {report.understanding && (
+            <div className="bg-white rounded-xl p-5 shadow-sm">
+              <h3 className="font-medium text-purple-600 mb-3">💜 我理解你的处境</h3>
+              <p className="text-gray-700 whitespace-pre-wrap">{report.understanding}</p>
+            </div>
+          )}
+
+          {/* 分析 */}
+          {report.analysis && (
+            <div className="bg-white rounded-xl p-5 shadow-sm">
+              <h3 className="font-medium text-purple-600 mb-3">🔍 问题分析</h3>
+              <p className="text-gray-700 whitespace-pre-wrap">{report.analysis}</p>
+            </div>
+          )}
+
+          {/* 建议 */}
+          {report.suggestions && report.suggestions.length > 0 && (
+            <div className="bg-white rounded-xl p-5 shadow-sm">
+              <h3 className="font-medium text-purple-600 mb-3">💡 支持建议</h3>
+              <ul className="space-y-2">
+                {report.suggestions.map((s: string, i: number) => (
+                  <li key={i} className="flex items-start gap-2 text-gray-700">
+                    <span className="text-purple-500 mt-0.5">{i + 1}.</span>
+                    <span>{s}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {/* 一句话总结 */}
+          {report.summary && (
+            <div className="bg-purple-100 rounded-xl p-4 text-center">
+              <p className="text-purple-800 italic">✨ {report.summary}</p>
+            </div>
+          )}
+
+          {/* 亮点（如果有） */}
+          {report.strengths && report.strengths.length > 0 && (
+            <div className="bg-amber-50 rounded-xl p-4">
+              <h4 className="text-sm font-medium text-amber-600 mb-2">🌟 值得关注的亮点</h4>
+              <ul className="text-xs text-gray-700 space-y-1">
+                {report.strengths.map((s: string, i: number) => (
+                  <li key={i}>• {s}</li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
       )}
 
@@ -145,7 +148,7 @@ export default function QuestionsPage() {
                 disabled={loading || !content.trim()}
                 className="px-6 py-2 bg-purple-500 text-white rounded-full text-sm font-medium disabled:opacity-50"
               >
-                {loading ? '提交中...' : '倾诉'}
+                {loading ? '倾诉中...' : '倾诉'}
               </button>
             </div>
           </div>
