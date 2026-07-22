@@ -195,3 +195,46 @@ export const profileApi = {
       `/profiles/versions?${childId ? 'childId=' + childId + '&' : ''}limit=${limit}&offset=${offset}`
     ),
 };
+
+// Nourishment API
+export interface NourishmentMoment {
+  id?: string;
+  childId: string;
+  fact: string;
+  feeling?: string;
+  source: 'manual' | 'accompany' | 'extracted';
+  extractedFromRecordId?: string;
+  createdAt?: string;
+}
+
+export interface NourishmentReport {
+  id?: string;
+  childId: string;
+  periodType: 'weekly' | 'monthly' | 'quarterly' | 'yearly';
+  periodStart: string;
+  periodEnd: string;
+  content: {
+    periodSummary: string;
+    momentCount: number;
+    feelings: string[];
+    facts: string[];
+    reflection: string;
+  };
+  momentCount: number;
+  createdAt?: string;
+}
+
+export const nourishmentApi = {
+  getMoments: (childId?: string, limit = 5, offset = 0) =>
+    request<{ moments: NourishmentMoment[]; total: number }>(
+      `/nourishment?${childId ? 'childId=' + childId + '&' : ''}limit=${limit}&offset=${offset}`
+    ),
+  addMoment: (data: { childId?: string; fact: string; feeling?: string; source?: string }) =>
+    request<{ moment: NourishmentMoment }>('/nourishment', { method: 'POST', body: JSON.stringify(data) }),
+  getReports: (childId?: string, periodType?: string) =>
+    request<{ reports: NourishmentReport[] }>(
+      `/nourishment/reports?${childId ? 'childId=' + childId + '&' : ''}${periodType ? 'periodType=' + periodType : ''}`
+    ),
+  generateReport: (data: { childId?: string; periodType: string }) =>
+    request<{ report: NourishmentReport }>('/nourishment/reports', { method: 'POST', body: JSON.stringify(data) }),
+};
