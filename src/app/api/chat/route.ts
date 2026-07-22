@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { query } from "@/lib/db";
+import { query, queryOne } from "@/lib/db";
 
 const SYSTEM_PROMPTS = {
   daily: `你是「内在结构养育」陪伴顾问。分析今日记录，给出：1个亮点 + 1个机会。不用 JSON，用 Markdown。不超过100字。禁止说教。`,
@@ -12,6 +12,30 @@ function classify(text: string): "daily" | "question" | "chat" {
   if (text.includes("今天") || text.includes("记录") || text.includes("发生")) return "daily";
   if (text.includes("？") || text.includes("怎么办") || text.includes("为什么")) return "question";
   return "chat";
+}
+
+// 默认孩子 UUID
+const DEFAULT_CHILD_ID = '00000000-0000-0000-0000-000000000001';
+
+// 获取或创建默认孩子
+async function getOrCreateDefaultChild(): Promise<string> {
+  try {
+    const existing = await queryOne(
+      `SELECT id FROM children WHERE id = $1`,
+      [DEFAULT_CHILD_ID]
+    );
+    if (!existing) {
+      await query(
+        `INSERT INTO children (id, user_id, name, gender, birth_date)
+         VALUES ($1, $1, '我的孩子', 'boy', '2015-01-01')`,
+        [DEFAULT_CHILD_ID]
+      );
+    }
+    return DEFAULT_CHILD_ID;
+  } catch (err) {
+    console.error("Failed to get or create default child:", err);
+    return DEFAULT_CHILD_ID;
+  }
 }
 
 export async function POST(req: NextRequest) {
@@ -55,16 +79,15 @@ export async function POST(req: NextRequest) {
     const data = await response.json();
     const reply = data.choices?.[0]?.message?.content || "没有收到回复";
 
-    // 保存记录到数据库（如果提供了 childId）
-    if (childId) {
-      try {
-        await query(
-          `INSERT INTO records (child_id, content, reply, intent) VALUES ($1, $2, $3, $4)`,
-          [childId, message, reply, intent]
-        );
-      } catch (dbErr) {
-        console.error("Failed to save record:", dbErr);
-      }
+    // 保存记录到数据库
+    const finalChildId = childId || await getOrCreateDefaultChild();
+    try {
+      await query(
+        `INSERT INTO records (child_id, content, reply, intent) VALUES ($1, $2, $3, $4)`,
+        [finalChildId, message, reply, intent]
+      );
+    } catch (dbErr) {
+      console.error("Failed to save record:", dbErr);
     }
 
     return NextResponse.json({ reply, intent });

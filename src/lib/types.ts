@@ -95,3 +95,76 @@ export interface ApiResponse<T = unknown> {
   message?: string;
   data: T;
 }
+
+// ========== 画像相关类型 ==========
+
+export interface Personality {
+  type: 'introvert' | 'extrovert' | 'mixed' | '';
+  details: string[];
+}
+
+export interface GrowthGoals {
+  enhancements: string[];
+  supports: string[];
+}
+
+export interface ChildProfileData {
+  id?: string;
+  childId: string;
+  personality: Personality;
+  interests: string[];
+  strengths: string[];
+  challenges: string[];
+  coreNeeds: string[];
+  growthGoals: GrowthGoals;
+  aiAnalysis: any;
+  parentWeight: number;
+  updatedAt?: string;
+}
+
+export interface ProfileEvent {
+  id?: string;
+  childId: string;
+  eventType: 'strength' | 'challenge' | 'milestone' | 'interaction' | 'growth';
+  fact: string;
+  interpretation?: string;
+  source: 'manual' | 'accompany' | 'venting';
+  createdAt?: string;
+}
+
+export interface ProfileVersion {
+  id?: string;
+  childId: string;
+  version: number;
+  snapshot: ChildProfileData;
+  modifiedBy: 'ai' | 'parent';
+  modifications: any;
+  aiAnalysisAtTime: any;
+  reviewFlags: any;
+  createdAt?: string;
+}
+
+export interface DailyCareRecord {
+  id: string;
+  childId: string;
+  content: string;
+  reply: any;
+  intent: string;
+  createdAt: string;
+}
+
+export interface DailyCareReport {
+  strengths?: string[];
+  opportunity_axis1?: {
+    dimension: string;
+    description: string;
+    suggestion: string;
+  };
+  opportunity_axis2?: {
+    element: string;
+    description: string;
+    suggestion: string;
+  };
+  advice?: string;
+  growth_summary?: string;
+}

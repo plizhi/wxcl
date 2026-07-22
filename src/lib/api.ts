@@ -18,7 +18,11 @@ async function request<T>(
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  const response = await fetch(path.startsWith('/api') ? path : `/api${path}`, {
+  // V2 API 使用 /v2/api 前缀
+  const basePath = '/v2';
+  const fullPath = path.startsWith('/v2') || path.startsWith('/api') ? path : `${basePath}${path}`;
+
+  const response = await fetch(fullPath, {
     ...options,
     headers,
   });
@@ -124,4 +128,70 @@ export const dailyCareApi = {
       method: "POST",
       body: JSON.stringify(feedback),
     }),
+};
+
+// Profile API
+export interface Personality {
+  type: 'introvert' | 'extrovert' | 'mixed' | '';
+  details: string[];
+}
+
+export interface GrowthGoals {
+  enhancements: string[];
+  supports: string[];
+}
+
+export interface ProfileData {
+  id?: string;
+  childId: string;
+  personality: Personality;
+  interests: string[];
+  strengths: string[];
+  challenges: string[];
+  coreNeeds: string[];
+  growthGoals: GrowthGoals;
+  aiAnalysis: any;
+  parentWeight: number;
+  updatedAt?: string;
+}
+
+export interface ProfileEvent {
+  id?: string;
+  childId: string;
+  eventType: 'strength' | 'challenge' | 'milestone' | 'interaction' | 'growth';
+  fact: string;
+  interpretation?: string;
+  source: 'manual' | 'accompany' | 'venting';
+  createdAt?: string;
+}
+
+export interface ProfileVersion {
+  id?: string;
+  childId: string;
+  version: number;
+  snapshot: ProfileData;
+  modifiedBy: 'ai' | 'parent';
+  modifications: any;
+  aiAnalysisAtTime: any;
+  reviewFlags: any;
+  createdAt?: string;
+}
+
+export const profileApi = {
+  getProfile: (childId?: string) =>
+    request<{ profile: ProfileData | null }>(`/profiles${childId ? '?childId=' + childId : ''}`),
+  saveProfile: (data: Partial<ProfileData> & { childId: string }) =>
+    request<{ profile: any }>('/profiles', { method: 'POST', body: JSON.stringify(data) }),
+  updateProfile: (data: Partial<ProfileData> & { childId: string; modifiedBy?: 'ai' | 'parent' }) =>
+    request<{ profile: any; version: number }>('/profiles', { method: 'PUT', body: JSON.stringify(data) }),
+  getEvents: (childId?: string, eventType?: string, limit = 50, offset = 0) =>
+    request<{ events: ProfileEvent[] }>(
+      `/profiles/events?${childId ? 'childId=' + childId + '&' : ''}${eventType ? 'eventType=' + eventType + '&' : ''}limit=${limit}&offset=${offset}`
+    ),
+  addEvent: (data: { childId?: string; eventType: string; fact: string; interpretation?: string; source?: string }) =>
+    request<{ event: ProfileEvent }>('/profiles/events', { method: 'POST', body: JSON.stringify(data) }),
+  getVersions: (childId?: string, limit = 20, offset = 0) =>
+    request<{ versions: ProfileVersion[] }>(
+      `/profiles/versions?${childId ? 'childId=' + childId + '&' : ''}limit=${limit}&offset=${offset}`
+    ),
 };

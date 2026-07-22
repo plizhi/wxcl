@@ -1,0 +1,89 @@
+import { NextRequest, NextResponse } from "next/server";
+import { query, queryOne } from "@/lib/db";
+
+const DEFAULT_CHILD_ID = '00000000-0000-0000-0000-000000000001';
+
+// 获取事件列表
+export async function GET(req: NextRequest) {
+  const childId = req.nextUrl.searchParams.get("childId") || DEFAULT_CHILD_ID;
+  const eventType = req.nextUrl.searchParams.get("eventType");
+  const limit = parseInt(req.nextUrl.searchParams.get("limit") || "50");
+  const offset = parseInt(req.nextUrl.searchParams.get("offset") || "0");
+
+  try {
+    let sql = `SELECT id, child_id, event_type, fact, interpretation, source, created_at
+               FROM profile_events
+               WHERE child_id = $1`;
+    const params: any[] = [childId];
+
+    if (eventType) {
+      sql += ` AND event_type = $2`;
+      params.push(eventType);
+    }
+
+    sql += ` ORDER BY created_at DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
+    params.push(limit, offset);
+
+    const events = await query(sql, params);
+
+    return NextResponse.json({
+      events: events.map(e => ({
+        id: e.id,
+        childId: e.child_id,
+        eventType: e.event_type,
+        fact: e.fact,
+        interpretation: e.interpretation,
+        source: e.source,
+        createdAt: e.created_at,
+      }))
+    });
+  } catch (err) {
+    console.error("DB error:", err);
+    return NextResponse.json({ error: "Database error" }, { status: 500 });
+  }
+}
+
+// 添加事件
+export async function POST(req: NextRequest) {
+  try {
+    const body = await req.json();
+    const {
+      childId = DEFAULT_CHILD_ID,
+      eventType,
+      fact,
+      interpretation,
+      source = 'manual',
+    } = body;
+
+    if (!eventType || !fact) {
+      return NextResponse.json({ error: "eventType and fact required" }, { status: 400 });
+    }
+
+    const validTypes = ['strength', 'challenge', 'milestone', 'interaction', 'growth'];
+    if (!validTypes.includes(eventType)) {
+      return NextResponse.json({ error: "invalid eventType" }, { status: 400 });
+    }
+
+    const result = await queryOne(
+      `INSERT INTO profile_events (child_id, event_type, fact, interpretation, source)
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING id, child_id, event_type, fact, interpretation, source, created_at`,
+      [childId, eventType, fact, interpretation, source]
+    );
+
+    return NextResponse.json({
+      event: {
+        id: result.id,
+        childId: result.child_id,
+        eventType: result.event_type,
+        fact: result.fact,
+        interpretation: result.interpretation,
+        source: result.source,
+        createdAt: result.created_at,
+      }
+    });
+  } catch (err) {
+    console.error("DB error:", err);
+    return NextResponse.json({ error: "Database error" }, { status: 500 });
+  }
+}

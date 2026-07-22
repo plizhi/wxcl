@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
-import { userApi } from '@/lib/api';
+import { userApi, profileApi, ProfileData } from '@/lib/api';
 
 interface ChildInfo {
   id?: number;
@@ -13,10 +13,13 @@ interface ChildInfo {
   personality?: string;
 }
 
+const DEFAULT_CHILD_ID = '00000000-0000-0000-0000-000000000001';
+
 export default function ProfilePage() {
   const router = useRouter();
   const { user, fetchUserInfo, logout, isLoading } = useAuth();
   const [children, setChildren] = useState<ChildInfo[]>([]);
+  const [profile, setProfile] = useState<ProfileData | null>(null);
   const [showAdd, setShowAdd] = useState(false);
   const [editingChild, setEditingChild] = useState<ChildInfo | null>(null);
   const [form, setForm] = useState({
@@ -29,6 +32,7 @@ export default function ProfilePage() {
   useEffect(() => {
     fetchUserInfo();
     loadChildren();
+    loadProfile();
   }, [fetchUserInfo]);
 
   async function loadChildren() {
@@ -37,6 +41,15 @@ export default function ProfilePage() {
       setChildren(res || []);
     } catch (e) {
       console.error('加载失败', e);
+    }
+  }
+
+  async function loadProfile() {
+    try {
+      const { profile: p } = await profileApi.getProfile(DEFAULT_CHILD_ID);
+      setProfile(p);
+    } catch (e) {
+      console.error('加载画像失败', e);
     }
   }
 
@@ -74,12 +87,116 @@ export default function ProfilePage() {
     }
   }
 
+  // 判断画像是否完整
+  const profileComplete = profile && (
+    (profile.personality?.type && profile.personality.type !== '') ||
+    (profile.interests && profile.interests.length > 0) ||
+    (profile.strengths && profile.strengths.length > 0)
+  );
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-amber-50 to-white pb-20">
       {/* Header */}
       <div className="sticky top-0 bg-white/90 backdrop-blur z-10 border-b border-gray-100">
         <div className="flex items-center justify-center px-4 h-14">
           <h1 className="text-lg font-medium">👤 我的</h1>
+        </div>
+      </div>
+
+      {/* 孩子画像卡片 */}
+      <div className="mx-4 mt-4">
+        <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
+          <div className="px-4 py-3 border-b border-gray-100 flex justify-between items-center">
+            <h2 className="text-sm font-medium text-gray-500">孩子画像</h2>
+            <button
+              onClick={() => router.push('/profile/setup')}
+              className="text-xs text-amber-500"
+            >
+              {profileComplete ? '编辑' : '去完善'}
+            </button>
+          </div>
+
+          {profile ? (
+            <div className="p-4 space-y-4">
+              {/* 性格 */}
+              {profile.personality?.type && (
+                <div>
+                  <div className="text-xs text-gray-400 mb-1">性格特质</div>
+                  <div className="flex gap-2 flex-wrap">
+                    <span className="px-3 py-1 bg-amber-100 text-amber-700 rounded-full text-sm">
+                      {profile.personality.type === 'introvert' ? '内向型' :
+                       profile.personality.type === 'extrovert' ? '外向型' : '混合型'}
+                    </span>
+                    {profile.personality.details?.map((d, i) => (
+                      <span key={i} className="px-2 py-1 bg-gray-100 text-gray-600 rounded-full text-xs">{d}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* 兴趣爱好 */}
+              {profile.interests && profile.interests.length > 0 && (
+                <div>
+                  <div className="text-xs text-gray-400 mb-1">兴趣爱好</div>
+                  <div className="flex gap-2 flex-wrap">
+                    {profile.interests.map((interest, i) => (
+                      <span key={i} className="px-3 py-1 bg-purple-100 text-purple-700 rounded-full text-sm">{interest}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* 优势强项 */}
+              {profile.strengths && profile.strengths.length > 0 && (
+                <div>
+                  <div className="text-xs text-gray-400 mb-1">优势强项</div>
+                  <div className="space-y-1">
+                    {profile.strengths.map((s, i) => (
+                      <div key={i} className="flex items-center gap-2 text-sm text-gray-700">
+                        <span className="text-amber-500">✨</span> {s}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* 支持方向 */}
+              {profile.growthGoals?.supports && profile.growthGoals.supports.length > 0 && (
+                <div>
+                  <div className="text-xs text-gray-400 mb-1">支持方向</div>
+                  <div className="space-y-1">
+                    {profile.growthGoals.supports.map((s, i) => (
+                      <div key={i} className="flex items-center gap-2 text-sm text-gray-700">
+                        <span className="text-purple-500">💜</span> {s}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {!profileComplete && (
+                <div className="text-center py-4 text-gray-400">
+                  <p className="text-sm">还没有填写画像</p>
+                  <button
+                    onClick={() => router.push('/profile/setup')}
+                    className="mt-2 text-amber-500 text-sm"
+                  >
+                    去完善 →
+                  </button>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="p-6 text-center">
+              <p className="text-sm text-gray-400 mb-4">还没有孩子画像</p>
+              <button
+                onClick={() => router.push('/profile/setup')}
+                className="px-6 py-2 bg-amber-500 text-white rounded-full text-sm"
+              >
+                去创建
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
