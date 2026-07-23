@@ -18,9 +18,9 @@ async function request<T>(
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  // V2 API 使用 /v2/api 前缀
+  // V2 API 使用 /v2 前缀
   const basePath = '/v2';
-  const fullPath = path.startsWith('/v2') || path.startsWith('/api') ? path : `${basePath}${path}`;
+  const fullPath = path.startsWith('/v2') ? path : `${basePath}${path}`;
 
   const response = await fetch(fullPath, {
     ...options,
