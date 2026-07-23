@@ -34,7 +34,7 @@ async function request<T>(
     if (response.status === 401) {
       localStorage.removeItem('token');
       localStorage.removeItem('userId');
-      window.location.href = '/login';
+      window.location.href = '/v2/login';
     }
     throw new Error(data.message || '请求失败');
   }

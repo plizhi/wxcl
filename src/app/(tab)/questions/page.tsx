@@ -3,19 +3,9 @@
 import { useState } from 'react';
 import { useToast } from '@/components/ui/toast';
 
-const SCENE_TAGS = [
-  { value: 'emotion', label: '情绪', emoji: '😢' },
-  { value: 'conflict', label: '冲突', emoji: '⚡' },
-  { value: 'silent', label: '冷战', emoji: '😶' },
-  { value: 'education', label: '教育', emoji: '📚' },
-  { value: 'daily', label: '日常', emoji: '🏠' },
-  { value: 'other', label: '其他', emoji: '💬' },
-];
-
 export default function QuestionsPage() {
   const { toast } = useToast();
   const [content, setContent] = useState('');
-  const [sceneTag, setSceneTag] = useState('daily');
   const [loading, setLoading] = useState(false);
   const [report, setReport] = useState<any>(null);
 
@@ -53,27 +43,6 @@ export default function QuestionsPage() {
       <div className="sticky top-0 bg-white/90 backdrop-blur z-10 border-b border-gray-100">
         <div className="flex items-center gap-4 px-4 h-14">
           <h1 className="text-lg font-medium">💬 压力吐槽</h1>
-        </div>
-      </div>
-
-      {/* 场景标签选择 */}
-      <div className="px-4 py-4">
-        <p className="text-sm text-gray-500 mb-3">发生了什么类型的困扰？</p>
-        <div className="flex flex-wrap gap-2">
-          {SCENE_TAGS.map(tag => (
-            <button
-              key={tag.value}
-              onClick={() => setSceneTag(tag.value)}
-              className={`px-4 py-2 rounded-full text-sm flex items-center gap-1.5 transition-colors ${
-                sceneTag === tag.value
-                  ? 'bg-purple-500 text-white'
-                  : 'bg-white text-gray-600 border border-gray-200'
-              }`}
-            >
-              <span>{tag.emoji}</span>
-              <span>{tag.label}</span>
-            </button>
-          ))}
         </div>
       </div>
 
