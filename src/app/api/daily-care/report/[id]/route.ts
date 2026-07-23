@@ -1,21 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query, queryOne } from "@/lib/db";
-
-function getUserId(req: NextRequest): string | null {
-  const auth = req.headers.get("authorization");
-  if (!auth || !auth.startsWith("Bearer ")) return null;
-  return "1"; // TODO: verify token and extract userId
-}
+import { getAuthFromRequest } from "@/lib/auth-utils";
 
 // GET /api/daily-care/report/[id]
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const userId = getUserId(req);
-  if (!userId) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const auth = getAuthFromRequest(req);
+  if (!auth) {
+    return NextResponse.json({ code: 401, message: "未登录" }, { status: 401 });
   }
+  const userId = auth.userId;
 
   const { id } = await params;
 

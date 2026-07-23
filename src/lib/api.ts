@@ -45,21 +45,21 @@ async function request<T>(
 // Auth API
 export const authApi = {
   login: (phone: string, activationCode?: string, password?: string, parentRole?: string) =>
-    request<{ token: string; userId: string }>('/auth/login', {
+    request<{ token: string; userId: string }>('/api/auth/login', {
       method: 'POST',
       body: JSON.stringify({ phone, activationCode, password, parentRole }),
     }),
   sendCode: (phone: string) =>
-    request('/auth/send-code', { method: 'POST', body: JSON.stringify({ phone }) }),
+    request('/api/auth/send-code', { method: 'POST', body: JSON.stringify({ phone }) }),
   verifyCode: (phone: string, code: string) =>
-    request('/auth/verify', { method: 'POST', body: JSON.stringify({ phone, code }) }),
+    request('/api/auth/verify', { method: 'POST', body: JSON.stringify({ phone, code }) }),
 };
 
 // User API
 export const userApi = {
-  getCurrentUser: () => request<User>('/user/me'),
+  getCurrentUser: () => request<User>('/api/user/me'),
   updateUser: (data: Partial<User>) =>
-    request('/user/me', { method: 'PATCH', body: JSON.stringify(data) }),
+    request('/api/user/me', { method: 'PATCH', body: JSON.stringify(data) }),
   getProfile: () => request<User>('/user/profile'),
   getChildren: () => request<ChildProfile[]>('/api/children'),
   saveChild: (data: Omit<ChildProfile, 'id'>) =>

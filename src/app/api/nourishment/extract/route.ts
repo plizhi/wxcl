@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query, queryOne } from "@/lib/db";
+import { getAuthFromRequest } from "@/lib/auth-utils";
 
 const DEFAULT_CHILD_ID = '00000000-0000-0000-0000-000000000001';
 
@@ -29,12 +30,6 @@ const SYSTEM_PROMPT = `你是「内在结构养育」陪伴顾问。请分析以
 如果记录中没有明显的滋养时刻，返回空的提取数组。
 禁止捏造事实，只提取真实存在的内容。`;
 
-function getUserId(req: NextRequest): string | null {
-  const auth = req.headers.get("authorization");
-  if (!auth || !auth.startsWith("Bearer ")) return null;
-  return "1";
-}
-
 async function getOrCreateDefaultChild(userId: string | null): Promise<string | null> {
   if (!userId) return DEFAULT_CHILD_ID;
 
@@ -59,7 +54,7 @@ async function getOrCreateDefaultChild(userId: string | null): Promise<string | 
 export async function POST(req: NextRequest) {
   try {
     const { limit = 10 } = await req.json();
-    const userId = getUserId(req);
+    const userId = getAuthFromRequest(req)?.userId;
     const childId = await getOrCreateDefaultChild(userId);
 
     // 获取最近的陪伴记录（未提取过的）

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query, queryOne } from "@/lib/db";
+import { getAuthFromRequest } from "@/lib/auth-utils";
 
 const SYSTEM_PROMPTS = {
   analyze: `你是「内在结构养育」陪伴顾问。分析今日记录，从以下专业框架给出解读：
@@ -75,12 +76,6 @@ const SYSTEM_PROMPTS = {
 禁止说教。禁止空洞的"你做得很好"。禁止直接给答案。`,
 };
 
-function getUserId(req: NextRequest): string | null {
-  const auth = req.headers.get("authorization");
-  if (!auth || !auth.startsWith("Bearer ")) return null;
-  return "1"; // TODO: verify token and extract userId
-}
-
 // 获取或创建默认孩子记录
 async function getOrCreateDefaultChild(userId: string | null): Promise<string | null> {
   try {
@@ -131,7 +126,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "content is required" }, { status: 400 });
     }
 
-    const userId = getUserId(req);
+    const userId = getAuthFromRequest(req)?.userId;
 
     let childId = requestedChildId;
     if (!childId && userId) {

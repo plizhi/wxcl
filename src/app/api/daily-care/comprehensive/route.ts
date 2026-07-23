@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query } from "@/lib/db";
+import { getAuthFromRequest } from "@/lib/auth-utils";
 
 const SYSTEM_PROMPTS = {
   comprehensive: `你是「内在结构养育」陪伴顾问。请分析以下多天的陪伴记录，从专业框架给出综合解读：
@@ -44,18 +45,12 @@ const SYSTEM_PROMPTS = {
 禁止说教。禁止空洞的"你做得很好"。`,
 };
 
-function getUserId(req: NextRequest): string | null {
-  const auth = req.headers.get("authorization");
-  if (!auth || !auth.startsWith("Bearer ")) return null;
-  return "1"; // TODO: verify token and extract userId
-}
-
 export async function GET(req: NextRequest) {
   const { searchParams } = req.nextUrl;
   const startDate = searchParams.get("startDate") || undefined;
   const endDate = searchParams.get("endDate") || undefined;
 
-  const userId = getUserId(req);
+  const userId = getAuthFromRequest(req)?.userId;
 
   try {
     let records;

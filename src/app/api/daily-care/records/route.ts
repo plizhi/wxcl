@@ -1,15 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query } from "@/lib/db";
-
-function getUserId(req: NextRequest): string | null {
-  const auth = req.headers.get("authorization");
-  if (!auth || !auth.startsWith("Bearer ")) return null;
-  return "1"; // TODO: verify token and extract userId
-}
+import { getAuthFromRequest } from "@/lib/auth-utils";
 
 // GET /api/daily-care/records
 export async function GET(req: NextRequest) {
-  const userId = getUserId(req);
+  const auth = getAuthFromRequest(req);
+  const userId = auth?.userId;
 
   const { searchParams } = req.nextUrl;
   const page = parseInt(searchParams.get("page") || "0");

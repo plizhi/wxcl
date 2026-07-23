@@ -1,24 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query, queryOne } from "@/lib/db";
-
-function getUserId(req: NextRequest): string | null {
-  const auth = req.headers.get("authorization");
-  if (!auth || !auth.startsWith("Bearer ")) return null;
-  // TODO: verify token and extract userId
-  // For now, return mock userId
-  return "1";
-}
+import { getAuthFromRequest } from "@/lib/auth-utils";
 
 // GET /api/children - 获取用户的孩子列表
 export async function GET(req: NextRequest) {
-  const userId = getUserId(req);
-  if (!userId) {
-    return NextResponse.json({ code: 401, message: "Unauthorized" }, { status: 401 });
+  const auth = getAuthFromRequest(req);
+  if (!auth) {
+    return NextResponse.json({ code: 401, message: "未登录" }, { status: 401 });
   }
+
+  const userId = auth.userId;
 
   try {
     const children = await query(
-      `SELECT id, name, gender, grade, personality, main_concerns, change_goal, created_at
+      `SELECT id, name, gender, birth_date, created_at
        FROM children
        WHERE user_id = $1
        ORDER BY created_at DESC`,
@@ -33,23 +28,24 @@ export async function GET(req: NextRequest) {
 
 // POST /api/children - 创建孩子档案
 export async function POST(req: NextRequest) {
-  const userId = getUserId(req);
-  if (!userId) {
-    return NextResponse.json({ code: 401, message: "Unauthorized" }, { status: 401 });
+  const auth = getAuthFromRequest(req);
+  if (!auth) {
+    return NextResponse.json({ code: 401, message: "未登录" }, { status: 401 });
   }
+  const userId = auth.userId;
 
   try {
-    const { name, gender, grade, personality, mainConcerns, changeGoal } = await req.json();
+    const { name, gender, birthDate } = await req.json();
 
     if (!name || !gender) {
       return NextResponse.json({ code: 400, message: "name and gender required" }, { status: 400 });
     }
 
     const child = await queryOne(
-      `INSERT INTO children (user_id, name, gender, grade, personality, main_concerns, change_goal, created_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
-       RETURNING id, name, gender, grade, personality, main_concerns, change_goal, created_at`,
-      [userId, name, gender, grade || null, personality || null, JSON.stringify(mainConcerns || []), JSON.stringify(changeGoal || [])]
+      `INSERT INTO children (user_id, name, gender, birth_date, created_at)
+       VALUES ($1, $2, $3, $4, NOW())
+       RETURNING id, name, gender, birth_date, created_at`,
+      [userId, name, gender, birthDate || null]
     );
 
     return NextResponse.json({ code: 0, data: child });
@@ -61,13 +57,14 @@ export async function POST(req: NextRequest) {
 
 // PUT /api/children - 更新孩子档案
 export async function PUT(req: NextRequest) {
-  const userId = getUserId(req);
-  if (!userId) {
-    return NextResponse.json({ code: 401, message: "Unauthorized" }, { status: 401 });
+  const auth = getAuthFromRequest(req);
+  if (!auth) {
+    return NextResponse.json({ code: 401, message: "未登录" }, { status: 401 });
   }
+  const userId = auth.userId;
 
   try {
-    const { id, name, gender, grade, personality, mainConcerns, changeGoal } = await req.json();
+    const { id, name, gender, birthDate } = await req.json();
 
     if (!id) {
       return NextResponse.json({ code: 400, message: "id required" }, { status: 400 });
@@ -77,13 +74,10 @@ export async function PUT(req: NextRequest) {
       `UPDATE children
        SET name = COALESCE($1, name),
            gender = COALESCE($2, gender),
-           grade = COALESCE($3, grade),
-           personality = COALESCE($4, personality),
-           main_concerns = COALESCE($5, main_concerns),
-           change_goal = COALESCE($6, change_goal)
-       WHERE id = $7 AND user_id = $8
-       RETURNING id, name, gender, grade, personality, main_concerns, change_goal, created_at`,
-      [name, gender, grade, personality, mainConcerns ? JSON.stringify(mainConcerns) : null, changeGoal ? JSON.stringify(changeGoal) : null, id, userId]
+           birth_date = COALESCE($3, birth_date)
+       WHERE id = $4 AND user_id = $5
+       RETURNING id, name, gender, birth_date, created_at`,
+      [name, gender, birthDate, id, userId]
     );
 
     return NextResponse.json({ code: 0, data: child });
@@ -95,10 +89,11 @@ export async function PUT(req: NextRequest) {
 
 // DELETE /api/children - 删除孩子档案
 export async function DELETE(req: NextRequest) {
-  const userId = getUserId(req);
-  if (!userId) {
-    return NextResponse.json({ code: 401, message: "Unauthorized" }, { status: 401 });
+  const auth = getAuthFromRequest(req);
+  if (!auth) {
+    return NextResponse.json({ code: 401, message: "未登录" }, { status: 401 });
   }
+  const userId = auth.userId;
 
   const id = req.nextUrl.searchParams.get("id");
   if (!id) {
