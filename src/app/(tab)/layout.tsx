@@ -18,7 +18,7 @@ export default function TabLayout({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!isLoading && !isLoggedIn) {
-      router.replace('/v2/login');
+      router.replace('/login');
     }
   }, [isLoggedIn, isLoading, router]);
 
