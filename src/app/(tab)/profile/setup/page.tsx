@@ -425,7 +425,7 @@ export default function ProfileSetupPage() {
       </div>
 
       {/* 底部按钮 */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white px-4 py-4 shadow-lg">
+      <div className="fixed bottom-16 left-0 right-0 bg-white px-4 py-4 shadow-lg z-40">
         <button
           onClick={handleNext}
           disabled={saving}

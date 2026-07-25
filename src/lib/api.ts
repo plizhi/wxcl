@@ -188,20 +188,20 @@ export interface ProfileVersion {
 
 export const profileApi = {
   getProfile: (childId?: string) =>
-    request<{ profile: ProfileData | null }>(`/profiles${childId ? '?childId=' + childId : ''}`),
+    request<{ profile: ProfileData | null }>(`/api/profiles${childId ? '?childId=' + childId : ''}`),
   saveProfile: (data: Partial<ProfileData> & { childId: string }) =>
-    request<{ profile: any }>('/profiles', { method: 'POST', body: JSON.stringify(data) }),
+    request<{ profile: any }>('/api/profiles', { method: 'POST', body: JSON.stringify(data) }),
   updateProfile: (data: Partial<ProfileData> & { childId: string; modifiedBy?: 'ai' | 'parent' }) =>
-    request<{ profile: any; version: number }>('/profiles', { method: 'PUT', body: JSON.stringify(data) }),
+    request<{ profile: any; version: number }>('/api/profiles', { method: 'PUT', body: JSON.stringify(data) }),
   getEvents: (childId?: string, eventType?: string, limit = 50, offset = 0) =>
     request<{ events: ProfileEvent[] }>(
-      `/profiles/events?${childId ? 'childId=' + childId + '&' : ''}${eventType ? 'eventType=' + eventType + '&' : ''}limit=${limit}&offset=${offset}`
+      `/api/profiles/events?${childId ? 'childId=' + childId + '&' : ''}${eventType ? 'eventType=' + eventType + '&' : ''}limit=${limit}&offset=${offset}`
     ),
   addEvent: (data: { childId?: string; eventType: string; fact: string; interpretation?: string; source?: string }) =>
-    request<{ event: ProfileEvent }>('/profiles/events', { method: 'POST', body: JSON.stringify(data) }),
+    request<{ event: ProfileEvent }>('/api/profiles/events', { method: 'POST', body: JSON.stringify(data) }),
   getVersions: (childId?: string, limit = 20, offset = 0) =>
     request<{ versions: ProfileVersion[] }>(
-      `/profiles/versions?${childId ? 'childId=' + childId + '&' : ''}limit=${limit}&offset=${offset}`
+      `/api/profiles/versions?${childId ? 'childId=' + childId + '&' : ''}limit=${limit}&offset=${offset}`
     ),
 };
 
