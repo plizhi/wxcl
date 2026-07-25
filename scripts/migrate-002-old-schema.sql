@@ -81,7 +81,7 @@ CREATE TABLE IF NOT EXISTS checkin (
     checkin_date DATE NOT NULL,
     emotion VARCHAR(20),
     good_thing TEXT,
-    task_completed TEXT,
+    task_completed INTEGER,
     created_at TIMESTAMP DEFAULT NOW()
 );
 
@@ -124,7 +124,7 @@ CREATE TABLE IF NOT EXISTS badge_config (
     description TEXT,
     icon VARCHAR(255),
     condition_type VARCHAR(50),
-    condition_value VARCHAR(50),
+    condition_value INTEGER,
     level INTEGER DEFAULT 1
 );
 
