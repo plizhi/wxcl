@@ -1,10 +1,12 @@
 'use client';
 
 import { useState } from 'react';
+import { useChild } from '@/context/ChildContext';
 import { useToast } from '@/components/ui/toast';
 
 export default function QuestionsPage() {
   const { toast } = useToast();
+  const { currentChildId } = useChild();
   const [content, setContent] = useState('');
   const [loading, setLoading] = useState(false);
   const [report, setReport] = useState<any>(null);
@@ -19,7 +21,7 @@ export default function QuestionsPage() {
       const res = await fetch('/v2/api/daily-care/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content: content.trim(), intent: 'venting' }),
+        body: JSON.stringify({ content: content.trim(), intent: 'venting', childId: currentChildId }),
       });
 
       const data = await res.json();

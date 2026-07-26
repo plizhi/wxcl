@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query, queryOne } from "@/lib/db";
+import { getAuthFromRequest } from "@/lib/auth-utils";
 
 const SYSTEM_PROMPTS = {
   daily: `你是「内在结构养育」陪伴顾问。分析今日记录，给出：1个亮点 + 1个机会。不用 JSON，用 Markdown。不超过100字。禁止说教。`,
@@ -14,31 +15,28 @@ function classify(text: string): "daily" | "question" | "chat" {
   return "chat";
 }
 
-// 默认孩子 UUID
-const DEFAULT_CHILD_ID = '00000000-0000-0000-0000-000000000001';
+async function getUserFirstChildId(userId: string): Promise<string | null> {
+  const child = await queryOne<{ id: string }>(
+    `SELECT id FROM children WHERE user_id = $1 ORDER BY created_at ASC LIMIT 1`,
+    [userId]
+  );
+  return child?.id || null;
+}
 
-// 获取或创建默认孩子
-async function getOrCreateDefaultChild(): Promise<string> {
-  try {
-    const existing = await queryOne(
-      `SELECT id FROM children WHERE id = $1`,
-      [DEFAULT_CHILD_ID]
-    );
-    if (!existing) {
-      await query(
-        `INSERT INTO children (id, user_id, name, gender, birth_date)
-         VALUES ($1, $1, '我的孩子', 'boy', '2015-01-01')`,
-        [DEFAULT_CHILD_ID]
-      );
-    }
-    return DEFAULT_CHILD_ID;
-  } catch (err) {
-    console.error("Failed to get or create default child:", err);
-    return DEFAULT_CHILD_ID;
-  }
+async function validateChildId(userId: string, childId: string): Promise<boolean> {
+  const child = await queryOne<{ id: string }>(
+    `SELECT id FROM children WHERE id = $1 AND user_id = $2`,
+    [childId, userId]
+  );
+  return !!child;
 }
 
 export async function POST(req: NextRequest) {
+  const auth = getAuthFromRequest(req);
+  if (!auth) {
+    return NextResponse.json({ code: 401, message: "未登录" }, { status: 401 });
+  }
+
   try {
     const { message, childId, intent: intentOverride, systemPrompt } = await req.json();
 
@@ -79,15 +77,29 @@ export async function POST(req: NextRequest) {
     const data = await response.json();
     const reply = data.choices?.[0]?.message?.content || "没有收到回复";
 
+    // 确定要使用的 childId
+    let finalChildId: string | null = null;
+    if (childId) {
+      const isValid = await validateChildId(auth.userId, childId);
+      if (isValid) {
+        finalChildId = childId;
+      }
+    }
+    if (!finalChildId) {
+      finalChildId = await getUserFirstChildId(auth.userId);
+    }
+    // 如果仍然没有有效的 childId，记录仍然保存（兼容旧逻辑）
+
     // 保存记录到数据库
-    const finalChildId = childId || await getOrCreateDefaultChild();
-    try {
-      await query(
-        `INSERT INTO records (child_id, content, reply, intent) VALUES ($1, $2, $3, $4)`,
-        [finalChildId, message, reply, intent]
-      );
-    } catch (dbErr) {
-      console.error("Failed to save record:", dbErr);
+    if (finalChildId) {
+      try {
+        await query(
+          `INSERT INTO records (child_id, content, reply, intent) VALUES ($1, $2, $3, $4)`,
+          [finalChildId, message, reply, intent]
+        );
+      } catch (dbErr) {
+        console.error("Failed to save record:", dbErr);
+      }
     }
 
     return NextResponse.json({ reply, intent });

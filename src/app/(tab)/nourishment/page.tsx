@@ -3,9 +3,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
+import { useChild } from '@/context/ChildContext';
 import { nourishmentApi, NourishmentMoment, NourishmentReport } from '@/lib/api';
 
-const DEFAULT_CHILD_ID = '00000000-0000-0000-0000-000000000001';
 const PAGE_SIZE = 5;
 
 const FEELING_OPTIONS = ['温暖', '被爱', '感动', '幸福', '满足', '骄傲'];
@@ -19,6 +19,7 @@ const PERIOD_TYPES = [
 export default function NourishmentPage() {
   const router = useRouter();
   const { isLoading } = useAuth();
+  const { currentChildId } = useChild();
   const [moments, setMoments] = useState<NourishmentMoment[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -31,9 +32,11 @@ export default function NourishmentPage() {
   const [saving, setSaving] = useState(false);
 
   const loadMoments = useCallback(async (offset = 0) => {
+    if (!currentChildId) return;
+
     setLoading(true);
     try {
-      const data = await nourishmentApi.getMoments(DEFAULT_CHILD_ID, PAGE_SIZE, offset);
+      const data = await nourishmentApi.getMoments(currentChildId, PAGE_SIZE, offset);
       if (offset === 0) {
         setMoments(data.moments || []);
       } else {
@@ -45,27 +48,30 @@ export default function NourishmentPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [currentChildId]);
 
   const loadReports = useCallback(async () => {
+    if (!currentChildId) return;
     try {
-      const data = await nourishmentApi.getReports(DEFAULT_CHILD_ID);
+      const data = await nourishmentApi.getReports(currentChildId);
       setReports(data.reports || []);
     } catch (e) {
       console.error('加载报告失败', e);
     }
-  }, []);
+  }, [currentChildId]);
 
   useEffect(() => {
-    if (!isLoading) loadMoments();
-  }, [isLoading, loadMoments]);
+    if (!isLoading && currentChildId) {
+      loadMoments();
+    }
+  }, [isLoading, currentChildId, loadMoments]);
 
   async function handleAdd() {
-    if (!fact.trim()) return;
+    if (!fact.trim() || !currentChildId) return;
     setSaving(true);
     try {
       const data = await nourishmentApi.addMoment({
-        childId: DEFAULT_CHILD_ID,
+        childId: currentChildId,
         fact: fact.trim(),
         feeling: feeling.trim(),
         source: 'manual',
@@ -85,9 +91,10 @@ export default function NourishmentPage() {
   }
 
   async function handleGenerateReport(periodType: string) {
+    if (!currentChildId) return;
     setGenerating(periodType);
     try {
-      const data = await nourishmentApi.generateReport({ childId: DEFAULT_CHILD_ID, periodType });
+      const data = await nourishmentApi.generateReport({ childId: currentChildId, periodType });
       if (data.report) setReports(prev => [data.report, ...prev]);
     } catch (e) {
       console.error('生成报告失败', e);

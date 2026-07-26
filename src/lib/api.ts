@@ -117,6 +117,11 @@ export const dailyCareApi = {
       method: "POST",
       body: JSON.stringify({ content }),
     }),
+  batchImport: (records: string[], childId?: string) =>
+    request<DailyCareReport>("/daily-care/batch", {
+      method: "POST",
+      body: JSON.stringify({ records, childId }),
+    }),
   getRecords: (page = 0, limit = 20) =>
     request<{ records: DailyCareRecord[]; total: number; page: number; limit: number }>(
       "/daily-care/records?page=" + page + "&limit=" + limit

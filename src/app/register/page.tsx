@@ -32,7 +32,7 @@ export default function RegisterPage() {
     try {
       await login(phone, activationCode, undefined, parentRole);
       toast('注册成功', 'success');
-      router.replace('/');
+      router.replace('/add-child');
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : String(error);
       if (msg.includes('已被使用')) {

@@ -1,11 +1,47 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query, queryOne } from "@/lib/db";
+import { getAuthFromRequest } from "@/lib/auth-utils";
 
-const DEFAULT_CHILD_ID = '00000000-0000-0000-0000-000000000001';
+// 辅助函数：从用户的孩子列表中获取第一个孩子
+async function getUserFirstChildId(userId: string): Promise<string | null> {
+  const child = await queryOne<{ id: string }>(
+    `SELECT id FROM children WHERE user_id = $1 ORDER BY created_at ASC LIMIT 1`,
+    [userId]
+  );
+  return child?.id || null;
+}
+
+// 辅助函数：验证 childId 是否属于该用户
+async function validateChildId(userId: string, childId: string): Promise<boolean> {
+  const child = await queryOne<{ id: string }>(
+    `SELECT id FROM children WHERE id = $1 AND user_id = $2`,
+    [childId, userId]
+  );
+  return !!child;
+}
 
 // 获取画像
 export async function GET(req: NextRequest) {
-  const childId = req.nextUrl.searchParams.get("childId") || DEFAULT_CHILD_ID;
+  const auth = getAuthFromRequest(req);
+  if (!auth) {
+    return NextResponse.json({ code: 401, message: "未登录" }, { status: 401 });
+  }
+
+  let childId = req.nextUrl.searchParams.get("childId");
+
+  // 如果没传 childId，获取用户的第一个孩子
+  if (!childId) {
+    childId = await getUserFirstChildId(auth.userId);
+    if (!childId) {
+      return NextResponse.json({ code: 400, message: "请先添加孩子" }, { status: 400 });
+    }
+  }
+
+  // 验证 childId 属于该用户
+  const isValid = await validateChildId(auth.userId, childId);
+  if (!isValid) {
+    return NextResponse.json({ code: 403, message: "无权访问该孩子的数据" }, { status: 403 });
+  }
 
   try {
     const profile = await queryOne(
@@ -43,19 +79,28 @@ export async function GET(req: NextRequest) {
 
 // 创建或更新画像
 export async function POST(req: NextRequest) {
+  const auth = getAuthFromRequest(req);
+  if (!auth) {
+    return NextResponse.json({ code: 401, message: "未登录" }, { status: 401 });
+  }
+
   try {
     const body = await req.json();
-    const {
-      childId = DEFAULT_CHILD_ID,
-      personality,
-      interests,
-      strengths,
-      challenges,
-      coreNeeds,
-      growthGoals,
-      aiAnalysis,
-      parentWeight = 0.5,
-    } = body;
+    let { childId, personality, interests, strengths, challenges, coreNeeds, growthGoals, aiAnalysis, parentWeight = 0.5 } = body;
+
+    // 如果没传 childId，获取用户的第一个孩子
+    if (!childId) {
+      childId = await getUserFirstChildId(auth.userId);
+      if (!childId) {
+        return NextResponse.json({ code: 400, message: "请先添加孩子" }, { status: 400 });
+      }
+    }
+
+    // 验证 childId 属于该用户
+    const isValid = await validateChildId(auth.userId, childId);
+    if (!isValid) {
+      return NextResponse.json({ code: 403, message: "无权访问该孩子的数据" }, { status: 403 });
+    }
 
     // 确保 JSON 字段被正确序列化
     const personalityJson = personality ? JSON.stringify(personality) : null;
@@ -93,21 +138,28 @@ export async function POST(req: NextRequest) {
 
 // 更新画像（带版本记录）
 export async function PUT(req: NextRequest) {
+  const auth = getAuthFromRequest(req);
+  if (!auth) {
+    return NextResponse.json({ code: 401, message: "未登录" }, { status: 401 });
+  }
+
   try {
     const body = await req.json();
-    const {
-      childId = DEFAULT_CHILD_ID,
-      personality,
-      interests,
-      strengths,
-      challenges,
-      coreNeeds,
-      growthGoals,
-      aiAnalysis,
-      parentWeight,
-      modifiedBy = 'parent',
-      reviewFlags,
-    } = body;
+    let { childId, personality, interests, strengths, challenges, coreNeeds, growthGoals, aiAnalysis, parentWeight, modifiedBy = 'parent', reviewFlags } = body;
+
+    // 如果没传 childId，获取用户的第一个孩子
+    if (!childId) {
+      childId = await getUserFirstChildId(auth.userId);
+      if (!childId) {
+        return NextResponse.json({ code: 400, message: "请先添加孩子" }, { status: 400 });
+      }
+    }
+
+    // 验证 childId 属于该用户
+    const isValid = await validateChildId(auth.userId, childId);
+    if (!isValid) {
+      return NextResponse.json({ code: 403, message: "无权访问该孩子的数据" }, { status: 403 });
+    }
 
     // 获取当前版本号
     const currentVersion = await queryOne(

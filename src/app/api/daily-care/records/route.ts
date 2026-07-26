@@ -5,7 +5,11 @@ import { getAuthFromRequest } from "@/lib/auth-utils";
 // GET /api/daily-care/records
 export async function GET(req: NextRequest) {
   const auth = getAuthFromRequest(req);
-  const userId = auth?.userId;
+  if (!auth) {
+    return NextResponse.json({ code: 401, message: "未登录" }, { status: 401 });
+  }
+
+  const userId = auth.userId;
 
   const { searchParams } = req.nextUrl;
   const page = parseInt(searchParams.get("page") || "0");
@@ -36,23 +40,7 @@ export async function GET(req: NextRequest) {
         [userId]
       );
     } else {
-      // 获取默认孩子的记录
-      const defaultChildId = '00000000-0000-0000-0000-000000000001';
-      records = await query(
-        `SELECT r.id, r.content, r.reply, r.created_at
-         FROM records r
-         WHERE r.child_id = $1 AND r.intent = 'daily'
-         ORDER BY r.created_at DESC
-         LIMIT $2 OFFSET $3`,
-        [defaultChildId, limit, offset]
-      );
-
-      total = await query(
-        `SELECT COUNT(*) as count
-         FROM records r
-         WHERE r.child_id = $1 AND r.intent = 'daily'`,
-        [defaultChildId]
-      );
+      return NextResponse.json({ code: 400, message: "请先登录" }, { status: 400 });
     }
 
     return NextResponse.json({

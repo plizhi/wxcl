@@ -1,7 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query, queryOne } from "@/lib/db";
+import { getAuthFromRequest } from "@/lib/auth-utils";
 
-const DEFAULT_CHILD_ID = '00000000-0000-0000-0000-000000000001';
+async function getUserFirstChildId(userId: string): Promise<string | null> {
+  const child = await query<{ id: string }>(
+    `SELECT id FROM children WHERE user_id = $1 ORDER BY created_at ASC LIMIT 1`,
+    [userId]
+  );
+  return child[0]?.id || null;
+}
+
+async function validateChildId(userId: string, childId: string): Promise<boolean> {
+  const child = await query<{ id: string }>(
+    `SELECT id FROM children WHERE id = $1 AND user_id = $2`,
+    [childId, userId]
+  );
+  return child.length > 0;
+}
 
 const transformReport = (r: any) => ({
   id: r.id, childId: r.child_id, periodType: r.period_type, periodStart: r.period_start,
@@ -9,7 +24,24 @@ const transformReport = (r: any) => ({
 });
 
 export async function GET(req: NextRequest) {
-  const childId = req.nextUrl.searchParams.get("childId") || DEFAULT_CHILD_ID;
+  const auth = getAuthFromRequest(req);
+  if (!auth) {
+    return NextResponse.json({ code: 401, message: "未登录" }, { status: 401 });
+  }
+
+  let childId = req.nextUrl.searchParams.get("childId");
+  if (!childId) {
+    childId = await getUserFirstChildId(auth.userId);
+    if (!childId) {
+      return NextResponse.json({ code: 400, message: "请先添加孩子" }, { status: 400 });
+    }
+  }
+
+  const isValid = await validateChildId(auth.userId, childId);
+  if (!isValid) {
+    return NextResponse.json({ code: 403, message: "无权访问该孩子的数据" }, { status: 403 });
+  }
+
   const periodType = req.nextUrl.searchParams.get("periodType");
 
   try {
@@ -26,8 +58,26 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  const auth = getAuthFromRequest(req);
+  if (!auth) {
+    return NextResponse.json({ code: 401, message: "未登录" }, { status: 401 });
+  }
+
   try {
-    const { childId = DEFAULT_CHILD_ID, periodType } = await req.json();
+    let { childId, periodType } = await req.json();
+
+    if (!childId) {
+      childId = await getUserFirstChildId(auth.userId);
+      if (!childId) {
+        return NextResponse.json({ code: 400, message: "请先添加孩子" }, { status: 400 });
+      }
+    }
+
+    const isValid = await validateChildId(auth.userId, childId);
+    if (!isValid) {
+      return NextResponse.json({ code: 403, message: "无权访问该孩子的数据" }, { status: 403 });
+    }
+
     if (!periodType) return NextResponse.json({ error: "periodType is required" }, { status: 400 });
 
     // 本地日期格式化

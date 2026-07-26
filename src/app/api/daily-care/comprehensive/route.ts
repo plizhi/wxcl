@@ -50,7 +50,12 @@ export async function GET(req: NextRequest) {
   const startDate = searchParams.get("startDate") || undefined;
   const endDate = searchParams.get("endDate") || undefined;
 
-  const userId = getAuthFromRequest(req)?.userId;
+  const auth = getAuthFromRequest(req);
+  if (!auth) {
+    return NextResponse.json({ code: 401, message: "未登录" }, { status: 401 });
+  }
+
+  const userId = auth.userId;
 
   try {
     let records;
@@ -77,26 +82,7 @@ export async function GET(req: NextRequest) {
 
       records = await query(sql, params);
     } else {
-      const defaultChildId = '00000000-0000-0000-0000-000000000001';
-      let sql = `
-        SELECT r.id, r.content, r.reply, r.created_at
-        FROM records r
-        WHERE r.child_id = $1 AND r.intent = 'daily'
-      `;
-      const params: any[] = [defaultChildId];
-
-      if (startDate) {
-        sql += ` AND DATE(r.created_at) >= $${params.length + 1}`;
-        params.push(startDate);
-      }
-      if (endDate) {
-        sql += ` AND DATE(r.created_at) <= $${params.length + 1}`;
-        params.push(endDate);
-      }
-
-      sql += ` ORDER BY r.created_at DESC LIMIT 50`;
-
-      records = await query(sql, params);
+      return NextResponse.json({ code: 400, message: "请先登录" }, { status: 400 });
     }
 
     if (!records || records.length === 0) {

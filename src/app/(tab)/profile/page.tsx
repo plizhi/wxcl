@@ -3,22 +3,21 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
+import { useChild } from '@/context/ChildContext';
 import { userApi, profileApi, ProfileData } from '@/lib/api';
 
 interface ChildInfo {
-  id?: number;
+  id: string;
   name: string;
   gender: string;
   grade?: string;
   personality?: string;
 }
 
-const DEFAULT_CHILD_ID = '00000000-0000-0000-0000-000000000001';
-
 export default function ProfilePage() {
   const router = useRouter();
   const { user, fetchUserInfo, logout, isLoading } = useAuth();
-  const [children, setChildren] = useState<ChildInfo[]>([]);
+  const { currentChild, currentChildId, children, setCurrentChild, refreshChildren } = useChild();
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [showAdd, setShowAdd] = useState(false);
   const [editingChild, setEditingChild] = useState<ChildInfo | null>(null);
@@ -31,22 +30,18 @@ export default function ProfilePage() {
 
   useEffect(() => {
     fetchUserInfo();
-    loadChildren();
-    loadProfile();
-  }, [fetchUserInfo]);
+    refreshChildren();
+  }, [fetchUserInfo, refreshChildren]);
 
-  async function loadChildren() {
-    try {
-      const res = await userApi.getChildren();
-      setChildren(res || []);
-    } catch (e) {
-      console.error('加载失败', e);
+  useEffect(() => {
+    if (currentChildId) {
+      loadProfile(currentChildId);
     }
-  }
+  }, [currentChildId]);
 
-  async function loadProfile() {
+  async function loadProfile(childId: string) {
     try {
-      const { profile: p } = await profileApi.getProfile(DEFAULT_CHILD_ID);
+      const { profile: p } = await profileApi.getProfile(childId);
       setProfile(p);
     } catch (e) {
       console.error('加载画像失败', e);
@@ -81,7 +76,7 @@ export default function ProfilePage() {
         await userApi.saveChild(form as any);
       }
       setShowAdd(false);
-      loadChildren();
+      refreshChildren();
     } catch (e) {
       console.error('保存失败', e);
     }
@@ -109,7 +104,7 @@ export default function ProfilePage() {
           <div className="px-4 py-3 border-b border-gray-100 flex justify-between items-center">
             <h2 className="text-sm font-medium text-gray-500">孩子画像</h2>
             <button
-              onClick={() => router.push('/profile/setup')}
+              onClick={() => router.push(`/profile/setup?childId=${currentChildId}`)}
               className="text-xs text-amber-500"
             >
               {profileComplete ? '编辑' : '去完善'}
@@ -178,7 +173,7 @@ export default function ProfilePage() {
                 <div className="text-center py-4 text-gray-400">
                   <p className="text-sm">还没有填写画像</p>
                   <button
-                    onClick={() => router.push('/profile/setup')}
+                    onClick={() => router.push(`/profile/setup?childId=${currentChildId}`)}
                     className="mt-2 text-amber-500 text-sm"
                   >
                     去完善 →
@@ -190,7 +185,7 @@ export default function ProfilePage() {
             <div className="p-6 text-center">
               <p className="text-sm text-gray-400 mb-4">还没有孩子画像</p>
               <button
-                onClick={() => router.push('/profile/setup')}
+                onClick={() => router.push(`/profile/setup?childId=${currentChildId}`)}
                 className="px-6 py-2 bg-amber-500 text-white rounded-full text-sm"
               >
                 去创建
@@ -215,32 +210,53 @@ export default function ProfilePage() {
             </div>
           ) : (
             <>
-              {children.map((child, idx) => (
-                <div key={idx} className="p-4 border-b border-gray-100 last:border-b-0">
+              {children.map((child) => (
+                <div
+                  key={child.id}
+                  className={`p-4 border-b border-gray-100 last:border-b-0 ${
+                    child.id === currentChildId ? 'bg-amber-50' : ''
+                  }`}
+                >
                   <div className="flex justify-between items-start mb-2">
                     <div>
-                      <span className="font-medium">{child.name || '孩子'}</span>
+                      <div className="flex items-center gap-2">
+                        {child.id === currentChildId && (
+                          <span className="text-xs bg-amber-400 text-white rounded-full px-2 py-0.5">当前</span>
+                        )}
+                        <span className="font-medium">{child.name || '孩子'}</span>
+                      </div>
                       <div className="text-xs text-gray-400 mt-0.5">
                         {child.gender === 'boy' ? '男孩' : child.gender === 'girl' ? '女孩' : ''}
                         {child.grade && ` · ${child.grade}`}
                       </div>
                     </div>
-                    <button
-                      onClick={() => {
-                        setEditingChild(child);
-                        setForm(child);
-                        setShowAdd(true);
-                      }}
-                      className="text-xs text-purple-500 border border-purple-200 rounded-full px-2 py-0.5"
-                    >
-                      编辑
-                    </button>
+                    {child.id === currentChildId ? (
+                      <button
+                        onClick={() => router.push('/profile/setup')}
+                        className="text-xs text-amber-500 border border-amber-200 rounded-full px-2 py-0.5"
+                      >
+                        完善画像
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => setCurrentChild(child)}
+                        className="text-xs text-purple-500 border border-purple-200 rounded-full px-2 py-0.5"
+                      >
+                        切换
+                      </button>
+                    )}
                   </div>
                   <div className="flex gap-2">
-                    <button className="flex-1 py-2 bg-amber-50 rounded-lg text-xs text-amber-700">
+                    <button
+                      onClick={() => router.push('/comprehensive-report')}
+                      className="flex-1 py-2 bg-amber-50 rounded-lg text-xs text-amber-700"
+                    >
                       📊 全景报告
                     </button>
-                    <button className="flex-1 py-2 bg-purple-50 rounded-lg text-xs text-purple-700">
+                    <button
+                      onClick={() => router.push('/nourishment')}
+                      className="flex-1 py-2 bg-purple-50 rounded-lg text-xs text-purple-700"
+                    >
                       💧 滋养时刻
                     </button>
                   </div>

@@ -1,8 +1,6 @@
 import { query } from './db';
 import { profileApi } from './api';
 
-const DEFAULT_CHILD_ID = '00000000-0000-0000-0000-000000000001';
-
 const EXTRACT_PROMPT = `你是「内在结构养育」分析师。请从以下记录中提取关键事件。
 
 分析记录，识别以下类型的事件：
@@ -33,7 +31,7 @@ export interface ExtractedEvent {
 
 export async function extractEventsFromRecord(
   content: string,
-  childId: string = DEFAULT_CHILD_ID
+  childId: string
 ): Promise<ExtractedEvent[]> {
   const deepseekApi = process.env.DEEPSEEK_API_KEY;
   if (!deepseekApi) {
@@ -81,7 +79,7 @@ export async function extractEventsFromRecord(
 
 // 从陪伴记录中提取事件并保存
 export async function extractAndSaveEventsFromRecords(
-  childId: string = DEFAULT_CHILD_ID,
+  childId: string,
   limit: number = 10
 ): Promise<number> {
   try {
@@ -130,7 +128,7 @@ export async function extractAndSaveEventsFromRecords(
 
 // 从压力吐槽中提取事件
 export async function extractAndSaveEventsFromQuestions(
-  childId: string = DEFAULT_CHILD_ID,
+  childId: string,
   limit: number = 10
 ): Promise<number> {
   try {
@@ -179,7 +177,7 @@ export async function extractAndSaveEventsFromQuestions(
 
 // AI 分析画像
 export async function analyzeProfile(
-  childId: string = DEFAULT_CHILD_ID
+  childId: string
 ): Promise<any> {
   const deepseekApi = process.env.DEEPSEEK_API_KEY;
   if (!deepseekApi) {

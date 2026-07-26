@@ -76,49 +76,39 @@ const SYSTEM_PROMPTS = {
 禁止说教。禁止空洞的"你做得很好"。禁止直接给答案。`,
 };
 
-// 获取或创建默认孩子记录
-async function getOrCreateDefaultChild(userId: string | null): Promise<string | null> {
+// 获取用户的第一个孩子
+async function getUserFirstChildId(userId: string): Promise<string | null> {
   try {
-    if (!userId) {
-      const defaultChildId = '00000000-0000-0000-0000-000000000001';
-      const existing = await queryOne(
-        `SELECT id FROM children WHERE id = $1`,
-        [defaultChildId]
-      );
-      if (!existing) {
-        await query(
-          `INSERT INTO children (id, user_id, name, gender, birth_date)
-           VALUES ($1, $1, '我的孩子', 'boy', '2015-01-01')`,
-          [defaultChildId]
-        );
-      }
-      return defaultChildId;
-    }
-
-    const existingChild = await queryOne(
-      `SELECT id FROM children WHERE user_id = $1 LIMIT 1`,
+    const child = await queryOne<{ id: string }>(
+      `SELECT id FROM children WHERE user_id = $1 ORDER BY created_at ASC LIMIT 1`,
       [userId]
     );
-
-    if (existingChild) {
-      return existingChild.id;
-    }
-
-    const newChild = await queryOne(
-      `INSERT INTO children (user_id, name, gender, birth_date)
-       VALUES ($1, '我的孩子', 'boy', '2015-01-01')
-       RETURNING id`,
-      [userId]
-    );
-
-    return newChild?.id || null;
+    return child?.id || null;
   } catch (err) {
-    console.error("Failed to get or create default child:", err);
+    console.error("Failed to get user first child:", err);
     return null;
   }
 }
 
+// 验证 childId 是否属于用户
+async function validateChildId(userId: string, childId: string): Promise<boolean> {
+  try {
+    const child = await queryOne<{ id: string }>(
+      `SELECT id FROM children WHERE id = $1 AND user_id = $2`,
+      [childId, userId]
+    );
+    return !!child;
+  } catch (err) {
+    return false;
+  }
+}
+
 export async function POST(req: NextRequest) {
+  const auth = getAuthFromRequest(req);
+  if (!auth) {
+    return NextResponse.json({ code: 401, message: "未登录" }, { status: 401 });
+  }
+
   try {
     const { content, childId: requestedChildId, intent = 'daily' } = await req.json();
 
@@ -126,11 +116,20 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "content is required" }, { status: 400 });
     }
 
-    const userId = getAuthFromRequest(req)?.userId;
-
     let childId = requestedChildId;
-    if (!childId && userId) {
-      childId = await getOrCreateDefaultChild(userId);
+
+    // 如果没有提供 childId，尝试获取用户的第一个孩子
+    if (!childId) {
+      childId = await getUserFirstChildId(auth.userId);
+      if (!childId) {
+        return NextResponse.json({ code: 400, message: "请先添加孩子" }, { status: 400 });
+      }
+    } else {
+      // 验证 childId 属于该用户
+      const isValid = await validateChildId(auth.userId, childId);
+      if (!isValid) {
+        return NextResponse.json({ code: 403, message: "无权访问该孩子的数据" }, { status: 403 });
+      }
     }
 
     const deepseekApi = process.env.DEEPSEEK_API_KEY;

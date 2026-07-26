@@ -3,12 +3,14 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
+import { useChild } from '@/context/ChildContext';
 import { useToast } from '@/components/ui/toast';
 
 export default function DailyCarePage() {
   const router = useRouter();
   const { toast } = useToast();
   const { user } = useAuth();
+  const { currentChildId } = useChild();
   const [content, setContent] = useState('');
   const [loading, setLoading] = useState(false);
   const [report, setReport] = useState<any>(null);
@@ -45,7 +47,7 @@ export default function DailyCarePage() {
       const res = await fetch('/v2/api/daily-care/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content: content.trim() }),
+        body: JSON.stringify({ content: content.trim(), childId: currentChildId }),
       });
 
       const data = await res.json();

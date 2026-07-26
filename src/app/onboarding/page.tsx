@@ -26,6 +26,9 @@ export default function OnboardingPage() {
   const { isLoggedIn } = useAuth();
   const { toast } = useToast();
 
+  // 从 URL 参数获取 childId
+  const [childId, setChildId] = useState<string | null>(null);
+
   const [records, setRecords] = useState<RecordEntry[]>([
     { id: 1, content: '' },
   ]);
@@ -36,6 +39,15 @@ export default function OnboardingPage() {
   const [showReport, setShowReport] = useState(false);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // 解析 URL 参数获取 childId
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const id = params.get('childId');
+    if (id) {
+      setChildId(id);
+    }
+  }, []);
 
   // 未登录重定向
   useEffect(() => {
@@ -96,7 +108,10 @@ export default function OnboardingPage() {
 
     setSubmitting(true);
     try {
-      const result = await dailyCareApi.batchImport(validRecords.map(r => r.content));
+      const result = await dailyCareApi.batchImport(
+        validRecords.map(r => r.content),
+        childId || undefined
+      );
       localStorage.setItem('onboarding_done', 'true');
 
       if (result.error) {

@@ -2,8 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { query, queryOne } from "@/lib/db";
 import { getAuthFromRequest } from "@/lib/auth-utils";
 
-const DEFAULT_CHILD_ID = '00000000-0000-0000-0000-000000000001';
-
 const SYSTEM_PROMPT = `你是「内在结构养育」陪伴顾问。请分析以下陪伴记录，识别其中蕴含的滋养时刻。
 
 滋养时刻 = 事实 + 正向感受
@@ -30,32 +28,43 @@ const SYSTEM_PROMPT = `你是「内在结构养育」陪伴顾问。请分析以
 如果记录中没有明显的滋养时刻，返回空的提取数组。
 禁止捏造事实，只提取真实存在的内容。`;
 
-async function getOrCreateDefaultChild(userId: string | null): Promise<string | null> {
-  if (!userId) return DEFAULT_CHILD_ID;
+async function getUserFirstChildId(userId: string): Promise<string | null> {
+  const child = await query<{ id: string }>(
+    `SELECT id FROM children WHERE user_id = $1 ORDER BY created_at ASC LIMIT 1`,
+    [userId]
+  );
+  return child[0]?.id || null;
+}
 
-  try {
-    const existingChild = await queryOne(
-      `SELECT id FROM children WHERE user_id = $1 LIMIT 1`,
-      [userId]
-    );
-    if (existingChild) return existingChild.id;
-
-    const newChild = await queryOne(
-      `INSERT INTO children (user_id, name, gender, birth_date)
-       VALUES ($1, '我的孩子', 'boy', '2015-01-01') RETURNING id`,
-      [userId]
-    );
-    return newChild?.id || DEFAULT_CHILD_ID;
-  } catch {
-    return DEFAULT_CHILD_ID;
-  }
+async function validateChildId(userId: string, childId: string): Promise<boolean> {
+  const child = await query<{ id: string }>(
+    `SELECT id FROM children WHERE id = $1 AND user_id = $2`,
+    [childId, userId]
+  );
+  return child.length > 0;
 }
 
 export async function POST(req: NextRequest) {
+  const auth = getAuthFromRequest(req);
+  if (!auth) {
+    return NextResponse.json({ code: 401, message: "未登录" }, { status: 401 });
+  }
+
   try {
-    const { limit = 10 } = await req.json();
-    const userId = getAuthFromRequest(req)?.userId;
-    const childId = await getOrCreateDefaultChild(userId);
+    const { limit = 10, childId } = await req.json();
+
+    let targetChildId = childId;
+    if (!targetChildId) {
+      targetChildId = await getUserFirstChildId(auth.userId);
+      if (!targetChildId) {
+        return NextResponse.json({ code: 400, message: "请先添加孩子" }, { status: 400 });
+      }
+    }
+
+    const isValid = await validateChildId(auth.userId, targetChildId);
+    if (!isValid) {
+      return NextResponse.json({ code: 403, message: "无权访问该孩子的数据" }, { status: 403 });
+    }
 
     // 获取最近的陪伴记录（未提取过的）
     const records = await query(
@@ -69,7 +78,7 @@ export async function POST(req: NextRequest) {
        )
        ORDER BY r.created_at DESC
        LIMIT $2`,
-      [childId, limit]
+      [targetChildId, limit]
     );
 
     if (records.length === 0) {
@@ -134,7 +143,7 @@ export async function POST(req: NextRequest) {
         await queryOne(
           `INSERT INTO nourishment_moments (child_id, fact, feeling, source, extracted_from_record_id)
            VALUES ($1, $2, $3, 'extracted', $4) RETURNING id`,
-          [childId, extraction.fact, extraction.feeling, extraction.recordId]
+          [targetChildId, extraction.fact, extraction.feeling, extraction.recordId]
         );
         savedCount++;
       } catch {

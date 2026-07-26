@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
+import { useChild } from '@/context/ChildContext';
 import { dailyCareApi, DailyCareReport, DailyCareRecord } from '@/lib/api';
 import { useToast } from '@/components/ui/toast';
 import html2canvas from 'html2canvas';
@@ -41,6 +42,7 @@ export default function ComprehensiveReportPage() {
   const router = useRouter();
   const { isLoading } = useAuth();
   const { toast } = useToast();
+  const { currentChildId } = useChild();
   const reportRef = useRef<HTMLDivElement>(null);
 
   const [records, setRecords] = useState<DailyCareRecord[]>([]);
@@ -339,7 +341,7 @@ export default function ComprehensiveReportPage() {
     const { startDate, endDate } = getDateRange();
 
     try {
-      const result = await dailyCareApi.getComprehensive(undefined, startDate, endDate);
+      const result = await dailyCareApi.getComprehensive(currentChildId, startDate, endDate);
       if (result.error) {
         toast(result.error, 'error');
       } else {

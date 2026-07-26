@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
+import { useChild } from '@/context/ChildContext';
 import { useToast } from '@/components/ui/toast';
 import { profileApi, ProfileData, Personality, GrowthGoals } from '@/lib/api';
 
@@ -25,16 +26,16 @@ const INTEREST_OPTIONS = [
   '手工', '户外活动', '科学', '动物', '美食', '旅行',
 ];
 
-const DEFAULT_CHILD_ID = '00000000-0000-0000-0000-000000000001';
-
 export default function ProfileSetupPage() {
   const router = useRouter();
   const { toast } = useToast();
   const { user } = useAuth();
+  const { currentChildId, currentChild } = useChild();
 
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [activeChildId, setActiveChildId] = useState<string | null>(null);
 
   // 基础信息
   const [name, setName] = useState('');
@@ -57,20 +58,41 @@ export default function ProfileSetupPage() {
   const [supports, setSupports] = useState<string[]>([]);
   const [customSupport, setCustomSupport] = useState('');
 
+  // 初始化 childId
   useEffect(() => {
-    loadProfile();
-  }, []);
+    // 优先使用 URL 参数中的 childId
+    const params = new URLSearchParams(window.location.search);
+    const urlChildId = params.get('childId');
+    if (urlChildId) {
+      setActiveChildId(urlChildId);
+    } else if (currentChildId) {
+      setActiveChildId(currentChildId);
+    }
+  }, [currentChildId]);
+
+  useEffect(() => {
+    if (activeChildId) {
+      loadProfile();
+    }
+  }, [activeChildId]);
 
   async function loadProfile() {
+    if (!activeChildId) return;
+
     setLoading(true);
     try {
-      const { profile } = await profileApi.getProfile(DEFAULT_CHILD_ID);
+      const { profile } = await profileApi.getProfile(activeChildId);
       if (profile) {
         setName(profile.personality?.details?.[0] || '');
         setPersonalityType(profile.personality?.type || '');
         setInterests(profile.interests || []);
         setStrengths(profile.strengths || []);
         setSupports(profile.growthGoals?.supports || []);
+      } else if (currentChild) {
+        // 如果没有画像，使用孩子的基本信息
+        setName(currentChild.name || '');
+        setGender(currentChild.gender || '');
+        setBirthDate(currentChild.birth_date || '');
       }
     } catch (e) {
       console.error('Failed to load profile:', e);
@@ -103,10 +125,16 @@ export default function ProfileSetupPage() {
   }
 
   async function handleSave() {
+    if (!activeChildId) {
+      toast('请先选择孩子', 'error');
+      setSaving(false);
+      return;
+    }
+
     setSaving(true);
     try {
       const profileData: Partial<ProfileData> & { childId: string } = {
-        childId: DEFAULT_CHILD_ID,
+        childId: activeChildId,
         personality: {
           type: personalityType as Personality['type'],
           details: personalityDetails ? [personalityDetails] : [],
