@@ -15,7 +15,7 @@ export interface Child {
 interface ChildContextType {
   currentChildId: string | null;
   currentChild: Child | null;
-  children: Child[];
+  childrenList: Child[];
   isLoading: boolean;
   setCurrentChild: (child: Child) => void;
   loadChildren: () => Promise<void>;
@@ -28,8 +28,8 @@ const CURRENT_CHILD_KEY = 'wxcl_current_child_id';
 
 export function ChildProvider({ children }: { children: React.ReactNode }) {
   const [currentChildId, setCurrentChildId] = useState<string | null>(null);
-  const [currentChild, setCurrentChild] = useState<Child | null>(null);
-  const [children, setChildren] = useState<Child[]>([]);
+  const [currentChild, setCurrentChildState] = useState<Child | null>(null);
+  const [childrenList, setChildrenList] = useState<Child[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   // 加载孩子列表
@@ -37,7 +37,7 @@ export function ChildProvider({ children }: { children: React.ReactNode }) {
     try {
       const res = await userApi.getChildren();
       const list: Child[] = res || [];
-      setChildren(list);
+      setChildrenList(list);
 
       // 如果没有当前孩子，设置第一个
       if (list.length > 0) {
@@ -46,16 +46,16 @@ export function ChildProvider({ children }: { children: React.ReactNode }) {
 
         if (storedChild) {
           setCurrentChildId(storedId);
-          setCurrentChild(storedChild);
+          setCurrentChildState(storedChild);
         } else {
           // 默认选择第一个孩子
           setCurrentChildId(list[0].id);
-          setCurrentChild(list[0]);
+          setCurrentChildState(list[0]);
           localStorage.setItem(CURRENT_CHILD_KEY, list[0].id);
         }
       } else {
         setCurrentChildId(null);
-        setCurrentChild(null);
+        setCurrentChildState(null);
       }
     } catch (e) {
       console.error('加载孩子列表失败', e);
@@ -72,7 +72,7 @@ export function ChildProvider({ children }: { children: React.ReactNode }) {
   // 切换当前孩子
   const setCurrentChild = useCallback((child: Child) => {
     setCurrentChildId(child.id);
-    setCurrentChild(child);
+    setCurrentChildState(child);
     localStorage.setItem(CURRENT_CHILD_KEY, child.id);
   }, []);
 
@@ -86,7 +86,7 @@ export function ChildProvider({ children }: { children: React.ReactNode }) {
       value={{
         currentChildId,
         currentChild,
-        children,
+        childrenList,
         isLoading,
         setCurrentChild,
         loadChildren,

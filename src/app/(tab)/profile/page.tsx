@@ -17,7 +17,7 @@ interface ChildInfo {
 export default function ProfilePage() {
   const router = useRouter();
   const { user, fetchUserInfo, logout, isLoading } = useAuth();
-  const { currentChild, currentChildId, children, setCurrentChild, refreshChildren } = useChild();
+  const { currentChild, currentChildId, childrenList, setCurrentChild, refreshChildren } = useChild();
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [showAdd, setShowAdd] = useState(false);
   const [editingChild, setEditingChild] = useState<ChildInfo | null>(null);
@@ -201,7 +201,7 @@ export default function ProfilePage() {
           <div className="px-4 py-3 border-b border-gray-100">
             <h2 className="text-sm font-medium text-gray-500">孩子信息</h2>
           </div>
-          {children.length === 0 ? (
+          {childrenList.length === 0 ? (
             <div className="p-6 text-center">
               <p className="text-sm text-gray-400 mb-4">还没有添加孩子信息</p>
               <button onClick={openAdd} className="px-6 py-2 bg-purple-500 text-white rounded-full text-sm">
@@ -210,7 +210,7 @@ export default function ProfilePage() {
             </div>
           ) : (
             <>
-              {children.map((child) => (
+              {childrenList.map((child) => (
                 <div
                   key={child.id}
                   className={`p-4 border-b border-gray-100 last:border-b-0 ${
