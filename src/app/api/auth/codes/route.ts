@@ -2,7 +2,18 @@ import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { generateCode } from '@/lib/auth';
 
+const ADMIN_SECRET = process.env.ADMIN_SECRET;
+
+function checkAdminSecret(request: NextRequest): boolean {
+  const secret = request.headers.get('X-Admin-Secret');
+  return secret === ADMIN_SECRET;
+}
+
 export async function POST(request: NextRequest) {
+  if (!checkAdminSecret(request)) {
+    return NextResponse.json({ code: 403, message: '无权限' }, { status: 403 });
+  }
+
   try {
     const { phone, count = 1 } = await request.json();
 
@@ -41,6 +52,10 @@ export async function POST(request: NextRequest) {
 }
 
 export async function GET(request: NextRequest) {
+  if (!checkAdminSecret(request)) {
+    return NextResponse.json({ code: 403, message: '无权限' }, { status: 403 });
+  }
+
   try {
     const { searchParams } = new URL(request.url);
     const phone = searchParams.get('phone');

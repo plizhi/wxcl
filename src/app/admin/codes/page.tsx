@@ -3,19 +3,53 @@
 import { useState, useEffect } from 'react';
 
 export default function AdminCodesPage() {
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [secret, setSecret] = useState('');
   const [codes, setCodes] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [phone, setPhone] = useState('');
   const [count, setCount] = useState(1);
   const [generatedCodes, setGeneratedCodes] = useState<any[]>([]);
+  const [error, setError] = useState('');
+
+  function handleLogin() {
+    if (!secret.trim()) {
+      setError('请输入管理员密钥');
+      return;
+    }
+    // 验证密钥
+    localStorage.setItem('admin_secret', secret.trim());
+    setIsAuthenticated(true);
+    setError('');
+  }
+
+  function handleLogout() {
+    localStorage.removeItem('admin_secret');
+    setIsAuthenticated(false);
+    setSecret('');
+    setCodes([]);
+  }
+
+  function getHeaders(): HeadersInit {
+    const savedSecret = localStorage.getItem('admin_secret') || secret;
+    return {
+      'Content-Type': 'application/json',
+      'X-Admin-Secret': savedSecret
+    };
+  }
 
   async function fetchCodes() {
     setLoading(true);
     try {
-      const resp = await fetch('/v2/api/auth/codes');
+      const resp = await fetch('/v2/api/auth/codes', {
+        headers: getHeaders()
+      });
       const data = await resp.json();
       if (data.code === 0) {
         setCodes(data.data.codes || []);
+      } else if (data.code === 403) {
+        setError('密钥无效');
+        setIsAuthenticated(false);
       }
     } catch (e) {
       console.error(e);
@@ -29,13 +63,16 @@ export default function AdminCodesPage() {
     try {
       const resp = await fetch('/v2/api/auth/codes', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getHeaders(),
         body: JSON.stringify({ phone: phone || undefined, count: parseInt(count as any) || 1 })
       });
       const data = await resp.json();
       if (data.code === 0) {
         setGeneratedCodes(data.data.codes || []);
         fetchCodes();
+      } else if (data.code === 403) {
+        setError('密钥无效');
+        setIsAuthenticated(false);
       } else {
         alert(data.message || '生成失败');
       }
@@ -48,13 +85,63 @@ export default function AdminCodesPage() {
   }
 
   useEffect(() => {
-    fetchCodes();
+    // 检查是否已保存密钥
+    const savedSecret = localStorage.getItem('admin_secret');
+    if (savedSecret) {
+      setSecret(savedSecret);
+      setIsAuthenticated(true);
+    }
   }, []);
 
+  useEffect(() => {
+    if (isAuthenticated) {
+      fetchCodes();
+    }
+  }, [isAuthenticated]);
+
+  // 未登录界面
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+        <div className="bg-white rounded-xl p-8 shadow-lg w-full max-w-md">
+          <h1 className="text-2xl font-bold mb-6 text-center">激活码管理</h1>
+          <div className="space-y-4">
+            <div>
+              <input
+                type="password"
+                value={secret}
+                onChange={e => setSecret(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && handleLogin()}
+                placeholder="请输入管理员密钥"
+                className="w-full px-4 py-3 border rounded-lg text-center"
+              />
+            </div>
+            {error && <p className="text-red-500 text-sm text-center">{error}</p>}
+            <button
+              onClick={handleLogin}
+              className="w-full py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
+            >
+              进入
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // 已登录界面
   return (
     <div className="min-h-screen bg-gray-100 p-8">
       <div className="max-w-6xl mx-auto">
-        <h1 className="text-2xl font-bold mb-8">激活码管理</h1>
+        <div className="flex justify-between items-center mb-8">
+          <h1 className="text-2xl font-bold">激活码管理</h1>
+          <button
+            onClick={handleLogout}
+            className="text-sm text-gray-500 hover:text-gray-700"
+          >
+            退出登录
+          </button>
+        </div>
 
         {/* 生成新激活码 */}
         <div className="bg-white rounded-xl p-6 mb-8 shadow">
@@ -111,7 +198,8 @@ export default function AdminCodesPage() {
             <h2 className="text-lg font-semibold">激活码列表</h2>
             <button
               onClick={fetchCodes}
-              className="text-sm text-purple-600 hover:text-purple-800"
+              disabled={loading}
+              className="text-sm text-purple-600 hover:text-purple-800 disabled:opacity-50"
             >
               刷新
             </button>
