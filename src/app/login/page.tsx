@@ -21,13 +21,15 @@ export default function LoginPage() {
 
     setLoading(true);
     try {
-      await login(phone, undefined, password || undefined);
+      await login(phone, password || undefined); // password 字段现在是激活码
       toast('登录成功', 'success');
       router.replace('/');
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : String(error);
-      if (msg.includes('手机号或密码')) {
-        toast('手机号或密码错误', 'error');
+      if (msg.includes('激活码') || msg.includes('验证码')) {
+        toast('激活码无效或已过期', 'error');
+      } else if (msg.includes('手机号')) {
+        toast('手机号或激活码错误', 'error');
       } else {
         toast(msg || '登录失败', 'error');
       }
@@ -68,12 +70,12 @@ export default function LoginPage() {
 
             <div>
               <input
-                type="password"
-                placeholder="请输入密码"
-                maxLength={20}
-                className="w-full px-4 py-4 border border-gray-200 rounded-lg text-base text-center focus:outline-none focus:border-purple-500"
+                type="text"
+                placeholder="请输入激活码"
+                maxLength={8}
+                className="w-full px-4 py-4 border border-gray-200 rounded-lg text-base text-center focus:outline-none focus:border-purple-500 uppercase"
                 value={password}
-                onChange={e => setPassword(e.target.value)}
+                onChange={e => setPassword(e.target.value.toUpperCase())}
                 onKeyDown={e => e.key === 'Enter' && handleLogin()}
               />
             </div>

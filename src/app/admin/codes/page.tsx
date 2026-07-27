@@ -1,0 +1,163 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+
+export default function AdminCodesPage() {
+  const [codes, setCodes] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [phone, setPhone] = useState('');
+  const [count, setCount] = useState(1);
+  const [generatedCodes, setGeneratedCodes] = useState<any[]>([]);
+
+  async function fetchCodes() {
+    setLoading(true);
+    try {
+      const resp = await fetch('/v2/api/auth/codes');
+      const data = await resp.json();
+      if (data.code === 0) {
+        setCodes(data.data.codes || []);
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function generateCodes() {
+    setLoading(true);
+    try {
+      const resp = await fetch('/v2/api/auth/codes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: phone || undefined, count: parseInt(count as any) || 1 })
+      });
+      const data = await resp.json();
+      if (data.code === 0) {
+        setGeneratedCodes(data.data.codes || []);
+        fetchCodes();
+      } else {
+        alert(data.message || '生成失败');
+      }
+    } catch (e) {
+      console.error(e);
+      alert('生成失败');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    fetchCodes();
+  }, []);
+
+  return (
+    <div className="min-h-screen bg-gray-100 p-8">
+      <div className="max-w-6xl mx-auto">
+        <h1 className="text-2xl font-bold mb-8">激活码管理</h1>
+
+        {/* 生成新激活码 */}
+        <div className="bg-white rounded-xl p-6 mb-8 shadow">
+          <h2 className="text-lg font-semibold mb-4">生成激活码</h2>
+          <div className="flex gap-4 items-end">
+            <div>
+              <label className="block text-sm text-gray-600 mb-1">手机号（可选，留空为通用码）</label>
+              <input
+                type="text"
+                value={phone}
+                onChange={e => setPhone(e.target.value.replace(/\D/g, ''))}
+                placeholder="可不填"
+                className="px-4 py-2 border rounded-lg w-48"
+                maxLength={11}
+              />
+            </div>
+            <div>
+              <label className="block text-sm text-gray-600 mb-1">数量</label>
+              <input
+                type="number"
+                value={count}
+                onChange={e => setCount(e.target.value)}
+                min={1}
+                max={100}
+                className="px-4 py-2 border rounded-lg w-24"
+              />
+            </div>
+            <button
+              onClick={generateCodes}
+              disabled={loading}
+              className="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50"
+            >
+              {loading ? '生成中...' : '生成'}
+            </button>
+          </div>
+
+          {generatedCodes.length > 0 && (
+            <div className="mt-4 p-4 bg-green-50 rounded-lg">
+              <p className="text-sm text-green-600 mb-2">生成成功！</p>
+              <div className="space-y-1">
+                {generatedCodes.map((c: any, i: number) => (
+                  <div key={i} className="font-mono text-sm">
+                    {c.phone} - {c.code}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* 激活码列表 */}
+        <div className="bg-white rounded-xl p-6 shadow">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-lg font-semibold">激活码列表</h2>
+            <button
+              onClick={fetchCodes}
+              className="text-sm text-purple-600 hover:text-purple-800"
+            >
+              刷新
+            </button>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b">
+                  <th className="text-left py-2 px-2">手机号</th>
+                  <th className="text-left py-2 px-2">激活码</th>
+                  <th className="text-left py-2 px-2">有效期</th>
+                  <th className="text-left py-2 px-2">状态</th>
+                  <th className="text-left py-2 px-2">创建时间</th>
+                </tr>
+              </thead>
+              <tbody>
+                {codes.map((c: any) => (
+                  <tr key={c.id} className="border-b hover:bg-gray-50">
+                    <td className="py-2 px-2">{c.phone || '通用'}</td>
+                    <td className="py-2 px-2 font-mono font-bold">{c.code}</td>
+                    <td className="py-2 px-2">{new Date(c.expires_at).toLocaleDateString()}</td>
+                    <td className="py-2 px-2">
+                      {c.used ? (
+                        <span className="text-green-600">已使用</span>
+                      ) : new Date(c.expires_at) < new Date() ? (
+                        <span className="text-red-600">已过期</span>
+                      ) : (
+                        <span className="text-blue-600">可用</span>
+                      )}
+                    </td>
+                    <td className="py-2 px-2">{new Date(c.created_at).toLocaleString()}</td>
+                  </tr>
+                ))}
+                {codes.length === 0 && (
+                  <tr>
+                    <td colSpan={5} className="py-8 text-center text-gray-400">
+                      暂无激活码
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
