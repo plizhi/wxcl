@@ -11,7 +11,7 @@ export default function RegisterPage() {
   const { toast } = useToast();
   const [phone, setPhone] = useState('');
   const [activationCode, setActivationCode] = useState('');
-  const [parentRole, setParentRole] = useState<'爸爸' | '妈妈' | ''>('');
+  const [parentRole, setParentRole] = useState<'爸爸' | '妈妈' | '爷爷' | '奶奶' | '外公' | '外婆' | '姥姥' | '姥爷' | '哥哥' | '姐姐' | '其他' | ''>('');
   const [loading, setLoading] = useState(false);
 
   async function handleRegister() {
@@ -70,13 +70,13 @@ export default function RegisterPage() {
             {/* 角色选择 */}
             <div>
               <label className="block text-sm text-gray-600 mb-2">您的角色是？</label>
-              <div className="grid grid-cols-2 gap-3">
-                {(['爸爸', '妈妈'] as const).map(role => (
+              <div className="grid grid-cols-3 gap-2">
+                {(['爸爸', '妈妈', '爷爷', '奶奶', '外公', '外婆', '姥姥', '姥爷', '哥哥', '姐姐', '其他'] as const).map(role => (
                   <button
                     key={role}
                     type="button"
                     onClick={() => setParentRole(role)}
-                    className={`py-3 rounded-xl text-base font-medium border-2 transition-all ${
+                    className={`py-2.5 rounded-xl text-sm font-medium border-2 transition-all ${
                       parentRole === role
                         ? 'border-purple-500 bg-purple-50 text-purple-600'
                         : 'border-gray-200 bg-white text-gray-700'
