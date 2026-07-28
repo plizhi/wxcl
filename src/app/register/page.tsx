@@ -20,6 +20,7 @@ export default function RegisterPage() {
 
   const handleRoleSelect = (role: string) => {
     if (role === '其他') {
+      // 点击"其他"按钮只是展开/收起下拉菜单
       setShowOtherDropdown(!showOtherDropdown);
     } else {
       setParentRole(role as '爸爸' | '妈妈');
@@ -135,13 +136,15 @@ export default function RegisterPage() {
                   <span>{showOtherDropdown ? '▲' : '▼'}</span>
                 </button>
                 {showOtherDropdown && (
-                  <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-10 overflow-hidden">
-                    {otherRoles.filter(r => r !== '其他').map(role => (
+                  <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-10 overflow-y-auto max-h-48">
+                    {otherRoles.map(role => (
                       <button
                         key={role}
                         type="button"
                         onClick={() => handleOtherSelect(role)}
-                        className="w-full py-2.5 px-4 text-left text-sm hover:bg-purple-50 transition-colors"
+                        className={`w-full py-2.5 px-4 text-left text-sm hover:bg-purple-50 transition-colors ${
+                          otherRole === role && role === '其他' ? 'bg-purple-50 text-purple-600' : ''
+                        }`}
                       >
                         {role}
                       </button>
