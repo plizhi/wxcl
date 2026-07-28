@@ -92,7 +92,7 @@ export default function LoginPage() {
           </div>
 
           <p className="text-center text-xs text-gray-400 mt-6 leading-relaxed">
-            没有账号？<a href="/register" className="text-purple-500 font-medium">立即注册 →</a>
+            没有账号？<a href="/v2/register" className="text-purple-500 font-medium">立即注册 →</a>
           </p>
         </div>
       </div>

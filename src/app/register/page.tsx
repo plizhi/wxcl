@@ -32,7 +32,7 @@ export default function RegisterPage() {
     try {
       await login(phone, activationCode, undefined, parentRole);
       toast('注册成功', 'success');
-      router.replace('/add-child');
+      router.replace('/v2/add-child');
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : String(error);
       if (msg.includes('已被使用')) {
@@ -121,7 +121,7 @@ export default function RegisterPage() {
             </button>
 
             <p className="text-center text-sm text-gray-400 mt-4">
-              已有账号？<a href="/login" className="text-purple-600">直接登录</a>
+              已有账号？<a href="/v2/login" className="text-purple-600">直接登录</a>
             </p>
           </div>
         </div>
