@@ -34,7 +34,10 @@ async function request<T>(
     if (response.status === 401) {
       localStorage.removeItem('token');
       localStorage.removeItem('userId');
-      window.location.href = '/v2/login';
+      // 如果不是登录页，才跳转到登录页
+      if (!window.location.pathname.includes('/login') && !window.location.pathname.includes('/register')) {
+        window.location.href = '/v2/login';
+      }
     }
     throw new Error(data.message || '请求失败');
   }
@@ -73,15 +76,15 @@ export const userApi = {
 // Question API
 export const questionApi = {
   submitQuestion: (data: { title?: string; content: string; sceneTag: string; childId?: number }) =>
-    request<Question>('/questions', { method: 'POST', body: JSON.stringify(data) }),
+    request<Question>('/api/questions', { method: 'POST', body: JSON.stringify(data) }),
   getQuestions: (params: { page?: number; pageSize?: number }) => {
     const qs = new URLSearchParams(params as Record<string, string>).toString();
     return request<{ content?: Question[]; records?: Question[]; list?: Question[]; total: number }>(
-      `/questions${qs ? `?${qs}` : ''}`
+      `/api/questions${qs ? `?${qs}` : ''}`
     );
   },
   submitFeedback: (id: string, feedback: string) =>
-    request(`/questions/${id}/feedback`, { method: 'POST', body: JSON.stringify({ feedback }) }),
+    request(`/api/questions/${id}/feedback`, { method: 'POST', body: JSON.stringify({ feedback }) }),
 };
 
 // Daily Care API
@@ -113,23 +116,23 @@ export interface DailyCareReport {
 
 export const dailyCareApi = {
   analyze: (content: string, recordDate?: string) =>
-    request<DailyCareReport>("/daily-care/analyze?recordDate=" + (recordDate || ""), {
+    request<DailyCareReport>("/api/daily-care/analyze?recordDate=" + (recordDate || ""), {
       method: "POST",
       body: JSON.stringify({ content }),
     }),
   batchImport: (records: string[], childId?: string) =>
-    request<DailyCareReport>("/daily-care/batch", {
+    request<DailyCareReport>("/api/daily-care/batch", {
       method: "POST",
       body: JSON.stringify({ records, childId }),
     }),
   getRecords: (page = 0, limit = 20) =>
     request<{ records: DailyCareRecord[]; total: number; page: number; limit: number }>(
-      "/daily-care/records?page=" + page + "&limit=" + limit
+      "/api/daily-care/records?page=" + page + "&limit=" + limit
     ),
   getReport: (id: number) =>
-    request<DailyCareReport>("/daily-care/report/" + id),
+    request<DailyCareReport>("/api/daily-care/report/" + id),
   submitFeedback: (recordId: number, feedback: { touchPoint: string; thinkingShift: string; plannedAction: string }) =>
-    request<void>("/daily-care/feedback/" + recordId, {
+    request<void>("/api/daily-care/feedback/" + recordId, {
       method: "POST",
       body: JSON.stringify(feedback),
     }),
@@ -139,7 +142,7 @@ export const dailyCareApi = {
     if (endDate) params.set("endDate", endDate);
     const qs = params.toString();
     return request<DailyCareReport>(
-      "/daily-care/comprehensive" + (qs ? "?" + qs : "")
+      "/api/daily-care/comprehensive" + (qs ? "?" + qs : "")
     );
   },
 };
@@ -241,18 +244,18 @@ export interface NourishmentReport {
 export const nourishmentApi = {
   getMoments: (childId?: string, limit = 5, offset = 0) =>
     request<{ moments: NourishmentMoment[]; total: number }>(
-      `/nourishment?${childId ? 'childId=' + childId + '&' : ''}limit=${limit}&offset=${offset}`
+      `/api/nourishment?${childId ? 'childId=' + childId + '&' : ''}limit=${limit}&offset=${offset}`
     ),
   addMoment: (data: { childId?: string; fact: string; feeling?: string; source?: string }) =>
-    request<{ moment: NourishmentMoment }>('/nourishment', { method: 'POST', body: JSON.stringify(data) }),
+    request<{ moment: NourishmentMoment }>('/api/nourishment', { method: 'POST', body: JSON.stringify(data) }),
   getReports: (childId?: string, periodType?: string) =>
     request<{ reports: NourishmentReport[] }>(
-      `/nourishment/reports?${childId ? 'childId=' + childId + '&' : ''}${periodType ? 'periodType=' + periodType : ''}`
+      `/api/nourishment/reports?${childId ? 'childId=' + childId + '&' : ''}${periodType ? 'periodType=' + periodType : ''}`
     ),
   generateReport: (data: { childId?: string; periodType: string }) =>
-    request<{ report: NourishmentReport }>('/nourishment/reports', { method: 'POST', body: JSON.stringify(data) }),
+    request<{ report: NourishmentReport }>('/api/nourishment/reports', { method: 'POST', body: JSON.stringify(data) }),
   extractFromRecords: (limit = 10) =>
     request<{ extractions: { fact: string; feeling: string }[]; savedCount: number; processedRecords: number }>(
-      '/nourishment/extract', { method: 'POST', body: JSON.stringify({ limit }) }
+      '/api/nourishment/extract', { method: 'POST', body: JSON.stringify({ limit }) }
     ),
 };

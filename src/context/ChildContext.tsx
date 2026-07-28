@@ -34,6 +34,13 @@ export function ChildProvider({ children }: { children: React.ReactNode }) {
 
   // 加载孩子列表
   const loadChildren = useCallback(async () => {
+    // 检查是否已登录（有无 token）
+    const token = localStorage.getItem('token');
+    if (!token) {
+      setIsLoading(false);
+      return;
+    }
+
     try {
       const res = await userApi.getChildren();
       const list: Child[] = res || [];
@@ -57,8 +64,13 @@ export function ChildProvider({ children }: { children: React.ReactNode }) {
         setCurrentChildId(null);
         setCurrentChildState(null);
       }
-    } catch (e) {
-      console.error('加载孩子列表失败', e);
+    } catch (e: any) {
+      // 忽略 401 错误（未登录），不打印避免刷屏
+      if (e?.message?.includes('401') || e?.message?.includes('未登录')) {
+        console.log('未登录，跳过加载孩子列表');
+      } else {
+        console.error('加载孩子列表失败', e);
+      }
     } finally {
       setIsLoading(false);
     }

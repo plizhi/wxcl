@@ -67,7 +67,7 @@ export default function HomePage() {
         <div className="relative mb-8">
           <div
             className="h-48 rounded-2xl bg-cover bg-center bg-no-repeat flex items-end px-6 pb-5"
-            style={{ backgroundImage: 'url(/media/apricot-forest-full.png)' }}
+            style={{ backgroundImage: 'url(/v2/media/apricot-forest-full.png)' }}
           >
             <div className="absolute inset-0 rounded-2xl bg-gradient-to-t from-black/50 via-transparent to-transparent" />
             <div className="relative z-10 w-full">

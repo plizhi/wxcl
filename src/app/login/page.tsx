@@ -21,7 +21,8 @@ export default function LoginPage() {
 
     setLoading(true);
     try {
-      await login(phone, password || undefined); // password 字段现在是激活码
+      // 支持密码登录（老用户）和激活码登录
+      await login(phone, undefined, password || undefined);
       toast('登录成功', 'success');
       router.replace('/');
     } catch (error: unknown) {
@@ -29,7 +30,7 @@ export default function LoginPage() {
       if (msg.includes('激活码') || msg.includes('验证码')) {
         toast('激活码无效或已过期', 'error');
       } else if (msg.includes('手机号')) {
-        toast('手机号或激活码错误', 'error');
+        toast('手机号或密码错误', 'error');
       } else {
         toast(msg || '登录失败', 'error');
       }
@@ -44,7 +45,7 @@ export default function LoginPage() {
       <div className="text-center pt-16 pb-8">
         <div
           className="h-40 mx-4 rounded-2xl bg-cover bg-center bg-no-repeat mb-4"
-          style={{ backgroundImage: 'url(/media/apricot-forest-full.png)' }}
+          style={{ backgroundImage: 'url(/v2/media/apricot-forest-full.png)' }}
         />
         <p className="text-lg text-purple-700 mb-1">让我们一起在时光里</p>
         <h1 className="text-3xl font-bold text-purple-900">望杏成林</h1>
@@ -71,11 +72,11 @@ export default function LoginPage() {
             <div>
               <input
                 type="text"
-                placeholder="请输入激活码"
-                maxLength={8}
-                className="w-full px-4 py-4 border border-gray-200 rounded-lg text-base text-center focus:outline-none focus:border-purple-500 uppercase"
+                placeholder="请输入密码或激活码"
+                maxLength={20}
+                className="w-full px-4 py-4 border border-gray-200 rounded-lg text-base text-center focus:outline-none focus:border-purple-500"
                 value={password}
-                onChange={e => setPassword(e.target.value.toUpperCase())}
+                onChange={e => setPassword(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && handleLogin()}
               />
             </div>
