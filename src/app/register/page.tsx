@@ -11,8 +11,34 @@ export default function RegisterPage() {
   const { toast } = useToast();
   const [phone, setPhone] = useState('');
   const [activationCode, setActivationCode] = useState('');
-  const [parentRole, setParentRole] = useState<'爸爸' | '妈妈' | '爷爷' | '奶奶' | '外公' | '外婆' | '姥姥' | '姥爷' | '哥哥' | '姐姐' | '其他' | ''>('');
+  const [parentRole, setParentRole] = useState<'爸爸' | '妈妈' | ''>('');
+  const [otherRole, setOtherRole] = useState('');
+  const [showOtherDropdown, setShowOtherDropdown] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  const otherRoles = ['爷爷', '奶奶', '外公', '外婆', '姥爷', '姥姥', '哥哥', '姐姐', '叔叔', '阿姨', '其他'];
+
+  const handleRoleSelect = (role: string) => {
+    if (role === '其他') {
+      setShowOtherDropdown(!showOtherDropdown);
+    } else {
+      setParentRole(role as '爸爸' | '妈妈');
+      setOtherRole(role);
+      setShowOtherDropdown(false);
+    }
+  };
+
+  const handleOtherSelect = (role: string) => {
+    setOtherRole(role);
+    setShowOtherDropdown(false);
+  };
+
+  const getDisplayRole = () => {
+    if (parentRole && otherRole && !['爸爸', '妈妈'].includes(otherRole)) {
+      return otherRole;
+    }
+    return parentRole || otherRole;
+  };
 
   async function handleRegister() {
     if (!phone || phone.length !== 11) {
@@ -23,14 +49,14 @@ export default function RegisterPage() {
       toast('请输入激活码', 'error');
       return;
     }
-    if (!parentRole) {
+    if (!getDisplayRole()) {
       toast('请选择您的角色', 'error');
       return;
     }
 
     setLoading(true);
     try {
-      await login(phone, activationCode, undefined, parentRole);
+      await login(phone, activationCode, undefined, getDisplayRole() || undefined);
       toast('注册成功', 'success');
       router.replace('/v2/add-child');
     } catch (error: unknown) {
@@ -70,21 +96,58 @@ export default function RegisterPage() {
             {/* 角色选择 */}
             <div>
               <label className="block text-sm text-gray-600 mb-2">您的角色是？</label>
-              <div className="grid grid-cols-3 gap-2">
-                {(['爸爸', '妈妈', '爷爷', '奶奶', '外公', '外婆', '姥姥', '姥爷', '哥哥', '姐姐', '其他'] as const).map(role => (
-                  <button
-                    key={role}
-                    type="button"
-                    onClick={() => setParentRole(role)}
-                    className={`py-2.5 rounded-xl text-sm font-medium border-2 transition-all ${
-                      parentRole === role
-                        ? 'border-purple-500 bg-purple-50 text-purple-600'
-                        : 'border-gray-200 bg-white text-gray-700'
-                    }`}
-                  >
-                    {role}
-                  </button>
-                ))}
+              <div className="flex gap-3 mb-2">
+                <button
+                  type="button"
+                  onClick={() => handleRoleSelect('爸爸')}
+                  className={`flex-1 py-3 rounded-xl text-base font-medium border-2 transition-all ${
+                    parentRole === '爸爸'
+                      ? 'border-purple-500 bg-purple-50 text-purple-600'
+                      : 'border-gray-200 bg-white text-gray-700'
+                  }`}
+                >
+                  👨 爸爸
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleRoleSelect('妈妈')}
+                  className={`flex-1 py-3 rounded-xl text-base font-medium border-2 transition-all ${
+                    parentRole === '妈妈'
+                      ? 'border-purple-500 bg-purple-50 text-purple-600'
+                      : 'border-gray-200 bg-white text-gray-700'
+                  }`}
+                >
+                  👩 妈妈
+                </button>
+              </div>
+              {/* 其他角色下拉 */}
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => handleRoleSelect('其他')}
+                  className={`w-full py-3 rounded-xl text-base font-medium border-2 transition-all flex items-center justify-between px-4 ${
+                    parentRole !== '爸爸' && parentRole !== '妈妈' && otherRole
+                      ? 'border-purple-500 bg-purple-50 text-purple-600'
+                      : 'border-gray-200 bg-white text-gray-700'
+                  }`}
+                >
+                  <span>{otherRole || '其他亲属'}</span>
+                  <span>{showOtherDropdown ? '▲' : '▼'}</span>
+                </button>
+                {showOtherDropdown && (
+                  <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-10 overflow-hidden">
+                    {otherRoles.filter(r => r !== '其他').map(role => (
+                      <button
+                        key={role}
+                        type="button"
+                        onClick={() => handleOtherSelect(role)}
+                        className="w-full py-2.5 px-4 text-left text-sm hover:bg-purple-50 transition-colors"
+                      >
+                        {role}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
 
