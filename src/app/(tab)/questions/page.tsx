@@ -20,7 +20,10 @@ export default function QuestionsPage() {
     try {
       const res = await fetch('/v2/api/daily-care/analyze', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token') || ''}`,
+        },
         body: JSON.stringify({ content: content.trim(), intent: 'venting', childId: currentChildId }),
       });
 

@@ -46,7 +46,10 @@ export default function DailyCarePage() {
     try {
       const res = await fetch('/v2/api/daily-care/analyze', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token') || ''}`,
+        },
         body: JSON.stringify({ content: content.trim(), childId: currentChildId }),
       });
 
@@ -133,8 +136,8 @@ export default function DailyCarePage() {
 
           {/* 亮点 */}
           {report.strengths && report.strengths.length > 0 && (
-            <div className="mb-4">
-              <h4 className="text-sm font-medium text-amber-600 mb-2">✨ 今日亮点</h4>
+            <div className="bg-amber-50 rounded-lg p-3 mb-3">
+              <h4 className="text-sm font-medium text-amber-700 mb-2">✨ 亮点</h4>
               <div className="space-y-1">
                 {report.strengths.map((s: string, i: number) => (
                   <p key={i} className="text-sm text-gray-700">{s}</p>
@@ -144,20 +147,19 @@ export default function DailyCarePage() {
           )}
 
           {/* 机会窗口 */}
-          {report.opportunity_axis1 && (
-            <div className="mb-4">
-              <h4 className="text-sm font-medium text-purple-600 mb-2">💡 机会窗口</h4>
-              <p className="text-sm text-gray-700">
-                <span className="font-medium">{report.opportunity_axis1.dimension}:</span> {report.opportunity_axis1.suggestion}
-              </p>
-            </div>
-          )}
-
-          {report.opportunity_axis2 && (
-            <div className="mb-4">
-              <p className="text-sm text-gray-700">
-                <span className="font-medium">{report.opportunity_axis2.element}:</span> {report.opportunity_axis2.suggestion}
-              </p>
+          {(report.opportunity_axis1 || report.opportunity_axis2) && (
+            <div className="bg-purple-50 rounded-lg p-3 mb-3">
+              <h4 className="text-sm font-medium text-purple-700 mb-2">🌱 机会</h4>
+              {report.opportunity_axis1 && (
+                <p className="text-sm text-gray-700 mb-1">
+                  <span className="font-medium">{report.opportunity_axis1.dimension}:</span> {report.opportunity_axis1.suggestion}
+                </p>
+              )}
+              {report.opportunity_axis2 && (
+                <p className="text-sm text-gray-700">
+                  <span className="font-medium">{report.opportunity_axis2.element}:</span> {report.opportunity_axis2.suggestion}
+                </p>
+              )}
             </div>
           )}
 

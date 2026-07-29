@@ -9,7 +9,7 @@ import { userApi } from '@/lib/api';
 
 export default function AddChildPage() {
   const router = useRouter();
-  const { isLoggedIn } = useAuth();
+  const { isLoggedIn, isLoading } = useAuth();
   const { refreshChildren, setCurrentChild } = useChild();
   const { toast } = useToast();
 
@@ -18,13 +18,13 @@ export default function AddChildPage() {
   const [birthDate, setBirthDate] = useState('');
   const [loading, setLoading] = useState(false);
 
-  // 未登录重定向
+  // 未登录重定向（等待 AuthContext 加载完成）
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (!token) {
+    if (isLoading) return; // 还在加载中，等着
+    if (!isLoggedIn) {
       router.replace('/login');
     }
-  }, [router]);
+  }, [isLoggedIn, isLoading, router]);
 
   async function handleSubmit() {
     if (!name.trim()) {
