@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ code: 400, message: '请输入激活码或密码' }, { status: 400 });
       }
 
-      // 查找激活码
+      // 查找激活码（用户专属 OR 通用）
       const codeSession = await queryOne<{
         id: string;
         code: string;
@@ -31,12 +31,12 @@ export async function POST(request: NextRequest) {
         used: boolean;
       }>(
         `SELECT id, code, expires_at, used FROM auth_sessions
-         WHERE phone = $1 AND expires_at > NOW()
+         WHERE code = $1 AND expires_at > NOW()
          ORDER BY created_at DESC LIMIT 1`,
-        [phone]
+        [activationCode]
       );
 
-      if (!codeSession || codeSession.used || codeSession.code !== activationCode) {
+      if (!codeSession || codeSession.used) {
         return NextResponse.json({ code: 400, message: '激活码无效或已过期' }, { status: 400 });
       }
 
