@@ -19,6 +19,9 @@ export default function DailyCarePage() {
   const [showNourishGuide, setShowNourishGuide] = useState(false);
   const [extracting, setExtracting] = useState(false);
   const [extractions, setExtractions] = useState<any[]>([]);
+  const [showReflection, setShowReflection] = useState(false);
+  const [reflectionContent, setReflectionContent] = useState('');
+  const [savingReflection, setSavingReflection] = useState(false);
 
   useEffect(() => {
     loadRecords();
@@ -82,6 +85,38 @@ export default function DailyCarePage() {
       toast('提取失败', 'error');
     } finally {
       setExtracting(false);
+    }
+  }
+
+  async function handleSaveReflection() {
+    if (!reflectionContent.trim()) return;
+    setSavingReflection(true);
+    try {
+      const res = await fetch('/v2/api/profiles/reflections', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token') || ''}`,
+        },
+        body: JSON.stringify({
+          content: reflectionContent.trim(),
+          childId: currentChildId,
+          relatedRecordId: report?.recordId,
+        }),
+      });
+      const data = await res.json();
+      if (data.code === 0) {
+        toast('反思已保存', 'success');
+        setShowReflection(false);
+        setReflectionContent('');
+      } else {
+        toast(data.message || '保存失败', 'error');
+      }
+    } catch (e) {
+      console.error('保存反思失败', e);
+      toast('保存失败', 'error');
+    } finally {
+      setSavingReflection(false);
     }
   }
 
@@ -269,6 +304,17 @@ export default function DailyCarePage() {
         </div>
       </div>
 
+      {/* 家长反思入口 */}
+      <div className="mx-4 mt-4">
+        <button
+          onClick={() => setShowReflection(true)}
+          className="w-full py-3 bg-blue-50 text-blue-600 rounded-xl text-sm flex items-center justify-center gap-2"
+        >
+          <span>✍️</span>
+          <span>今日家长反思（可选）</span>
+        </button>
+      </div>
+
       {/* 滋养时刻引导弹窗 */}
       {showNourishGuide && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
@@ -317,6 +363,40 @@ export default function DailyCarePage() {
                 查看全部滋养时刻 →
               </button>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* 家长反思弹窗 */}
+      {showReflection && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-xl">
+            <h3 className="font-medium text-lg mb-3 text-center">✍️ 今日反思</h3>
+            <p className="text-sm text-gray-500 mb-4 text-center">
+              记录你今天的感受和思考
+            </p>
+            <textarea
+              value={reflectionContent}
+              onChange={(e) => setReflectionContent(e.target.value)}
+              placeholder="今天我观察到了什么？有什么新的理解？"
+              rows={4}
+              className="w-full p-3 border border-gray-200 rounded-xl text-sm resize-none focus:outline-none focus:border-blue-400"
+            />
+            <div className="flex gap-3 mt-4">
+              <button
+                onClick={() => { setShowReflection(false); setReflectionContent(''); }}
+                className="flex-1 py-2 text-gray-600 text-sm"
+              >
+                取消
+              </button>
+              <button
+                onClick={handleSaveReflection}
+                disabled={!reflectionContent.trim() || savingReflection}
+                className="flex-1 py-2 bg-blue-500 text-white rounded-full text-sm disabled:opacity-50"
+              >
+                {savingReflection ? '保存中...' : '保存'}
+              </button>
+            </div>
           </div>
         </div>
       )}

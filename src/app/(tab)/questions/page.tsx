@@ -28,7 +28,7 @@ export default function QuestionsPage() {
       });
 
       const data = await res.json();
-      if (data.growth_summary || data.understanding || data.advice) {
+      if (data.understanding || data.summary || data.analysis) {
         setReport(data);
         toast('记录成功', 'success');
       } else {
