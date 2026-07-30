@@ -330,7 +330,10 @@ export default function ProfilePage() {
 
       {/* 滋养时刻入口 */}
       <div className="mx-4 mt-4">
-        <button className="w-full bg-white rounded-2xl p-4 shadow-sm text-left">
+        <button
+          onClick={() => router.push('/nourishment')}
+          className="w-full bg-white rounded-2xl p-4 shadow-sm text-left"
+        >
           <div className="flex items-center gap-3">
             <span className="text-2xl">💧</span>
             <div className="flex-1">
@@ -344,7 +347,10 @@ export default function ProfilePage() {
 
       {/* 紧急入口 */}
       <div className="mx-4 mt-4">
-        <button className="w-full bg-gradient-to-r from-red-500 to-orange-400 rounded-2xl p-4 text-white text-left">
+        <button
+          onClick={() => router.push('/emergency')}
+          className="w-full bg-gradient-to-r from-red-500 to-orange-400 rounded-2xl p-4 text-white text-left"
+        >
           <div className="flex items-center gap-3">
             <span className="text-3xl">🔥</span>
             <div>
