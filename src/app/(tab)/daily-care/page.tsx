@@ -16,6 +16,9 @@ export default function DailyCarePage() {
   const [report, setReport] = useState<any>(null);
   const [records, setRecords] = useState<any[]>([]);
   const [showHistory, setShowHistory] = useState(false);
+  const [showNourishGuide, setShowNourishGuide] = useState(false);
+  const [extracting, setExtracting] = useState(false);
+  const [extractions, setExtractions] = useState<any[]>([]);
 
   useEffect(() => {
     loadRecords();
@@ -34,6 +37,51 @@ export default function DailyCarePage() {
       }
     } catch (e) {
       console.error('加载记录失败', e);
+    }
+  }
+
+  async function checkNourishmentMoments() {
+    if (!currentChildId) return;
+    try {
+      const res = await fetch(`/v2/api/nourishment?childId=${currentChildId}&limit=1`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token') || ''}`,
+        },
+      });
+      const data = await res.json();
+      // 如果滋养时刻 < 3 条，显示引导
+      if (data.total !== undefined && data.total < 3) {
+        setShowNourishGuide(true);
+      }
+    } catch (e) {
+      console.error('检查滋养时刻失败', e);
+    }
+  }
+
+  async function handleExtractNourishment() {
+    setExtracting(true);
+    try {
+      const res = await fetch('/v2/api/nourishment/extract', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token') || ''}`,
+        },
+        body: JSON.stringify({ limit: 5, childId: currentChildId }),
+      });
+      const data = await res.json();
+      if (data.extractions && data.extractions.length > 0) {
+        setExtractions(data.extractions);
+        toast(`提取到 ${data.extractions.length} 个温暖时刻`, 'success');
+      } else {
+        toast('本次记录没有提取到新的温暖时刻', 'info');
+        setShowNourishGuide(false);
+      }
+    } catch (e) {
+      console.error('提取失败', e);
+      toast('提取失败', 'error');
+    } finally {
+      setExtracting(false);
     }
   }
 
@@ -58,6 +106,8 @@ export default function DailyCarePage() {
         setReport(data);
         await loadRecords();
         toast('记录成功', 'success');
+        // 检查是否需要引导
+        checkNourishmentMoments();
       } else {
         toast('记录失败', 'error');
       }
@@ -129,6 +179,29 @@ export default function DailyCarePage() {
         </div>
       )}
 
+      {/* 历史机会窗口提示 */}
+      {report && report.historyOpportunities && report.historyOpportunities.length > 0 && (
+        <div className="mx-4 mt-4 bg-blue-50 rounded-xl p-4">
+          <h4 className="text-sm font-medium text-blue-700 mb-2">🔔 持续关注</h4>
+          <p className="text-xs text-blue-600 mb-2">这些方向最近出现多次：</p>
+          <div className="space-y-2">
+            {report.historyOpportunities.map((opp: any, i: number) => (
+              <div key={i} className="bg-white rounded-lg p-2">
+                <p className="text-sm text-gray-700">
+                  <span className="font-medium text-purple-600">
+                    {opp.dimension || opp.element}:
+                  </span> {opp.description}
+                </p>
+                <p className="text-xs text-gray-500 mt-1">
+                  已出现 {opp.appearance_count} 次
+                  {opp.appearance_count >= 5 && ' ⚠️'}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* 分析报告 */}
       {report && (
         <div className="mx-4 mt-4 bg-white rounded-xl p-5 shadow-sm">
@@ -195,6 +268,58 @@ export default function DailyCarePage() {
           </div>
         </div>
       </div>
+
+      {/* 滋养时刻引导弹窗 */}
+      {showNourishGuide && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-xl">
+            <h3 className="font-medium text-lg mb-3 text-center">💧 滋养时刻</h3>
+            <p className="text-sm text-gray-600 mb-4 text-center">
+              检测到温暖的时刻，要不要保存下来？
+            </p>
+
+            {extractions.length > 0 ? (
+              <div className="space-y-3 mb-4 max-h-48 overflow-y-auto">
+                {extractions.map((ext, i) => (
+                  <div key={i} className="bg-pink-50 rounded-lg p-3">
+                    <p className="text-sm font-medium text-pink-700">✨ {ext.fact}</p>
+                    <p className="text-xs text-gray-500 mt-1">感受：{ext.feeling}</p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-gray-500 mb-4 text-center">
+                {extracting ? '正在提取温暖时刻...' : '点击下方按钮，从记录中提取温暖时刻'}
+              </p>
+            )}
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => { setShowNourishGuide(false); setExtractions([]); }}
+                className="flex-1 py-2 text-gray-600 text-sm"
+              >
+                稍后
+              </button>
+              <button
+                onClick={handleExtractNourishment}
+                disabled={extracting}
+                className="flex-1 py-2 bg-pink-500 text-white rounded-full text-sm disabled:opacity-50"
+              >
+                {extracting ? '提取中...' : '提取温暖时刻'}
+              </button>
+            </div>
+
+            {extractions.length > 0 && (
+              <button
+                onClick={() => { setShowNourishGuide(false); setExtractions([]); router.push('/nourishment'); }}
+                className="w-full mt-3 py-2 text-pink-600 text-sm"
+              >
+                查看全部滋养时刻 →
+              </button>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query, queryOne } from "@/lib/db";
 import { getAuthFromRequest } from "@/lib/auth-utils";
+import { callAI, parseAIResponse } from "@/lib/ai";
 
 const SYSTEM_PROMPT = `你是「内在结构养育」陪伴顾问。请分析以下陪伴记录，识别其中蕴含的滋养时刻。
 
@@ -85,49 +86,25 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ extractions: [], message: "没有新的记录需要提取" });
     }
 
-    const deepseekApi = process.env.DEEPSEEK_API_KEY;
-    if (!deepseekApi) {
-      return NextResponse.json({ error: "服务未配置" }, { status: 500 });
-    }
-
     const extractions: { fact: string; feeling: string; recordId: string }[] = [];
 
     for (const record of records) {
-      const response = await fetch("https://api.deepseek.com/chat/completions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${deepseekApi}`,
-        },
-        body: JSON.stringify({
-          model: "deepseek-chat",
-          messages: [
-            { role: "system", content: SYSTEM_PROMPT },
-            { role: "user", content: `分析以下记录：\n\n${record.content}` },
-          ],
-          max_tokens: 500,
-          stream: false,
-        }),
-      });
-
-      if (!response.ok) continue;
-
-      const data = await response.json();
-      const aiContent = data.choices?.[0]?.message?.content || "";
-
       try {
-        const jsonMatch = aiContent.match(/\{[\s\S]*\}/);
-        if (jsonMatch) {
-          const result = JSON.parse(jsonMatch[0]);
-          if (result.extractions && Array.isArray(result.extractions)) {
-            for (const item of result.extractions) {
-              if (item.fact && item.fact.trim()) {
-                extractions.push({
-                  fact: item.fact.trim(),
-                  feeling: (item.feeling || "温暖").trim(),
-                  recordId: record.id,
-                });
-              }
+        const aiResponse = await callAI({
+          messages: [{ role: 'user', content: `分析以下记录：\n\n${record.content}` }],
+          systemPrompt: SYSTEM_PROMPT,
+          maxTokens: 500,
+        });
+
+        const result = parseAIResponse<{ extractions?: { fact?: string; feeling?: string }[] }>(aiResponse.content);
+        if (result?.extractions && Array.isArray(result.extractions)) {
+          for (const item of result.extractions) {
+            if (item.fact && item.fact.trim()) {
+              extractions.push({
+                fact: item.fact.trim(),
+                feeling: (item.feeling || "温暖").trim(),
+                recordId: record.id,
+              });
             }
           }
         }

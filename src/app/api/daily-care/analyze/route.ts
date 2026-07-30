@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query, queryOne } from "@/lib/db";
 import { getAuthFromRequest } from "@/lib/auth-utils";
+import { callAI, parseAIResponse } from "@/lib/ai";
 
 const SYSTEM_PROMPTS = {
   analyze: `你是「内在结构养育」陪伴顾问。分析今日记录，从以下专业框架给出解读：
@@ -103,6 +104,117 @@ async function validateChildId(userId: string, childId: string): Promise<boolean
   }
 }
 
+// 获取孩子的开放机会窗口
+async function getOpenOpportunities(childId: string) {
+  try {
+    const opportunities = await query<{
+      id: string;
+      dimension: string;
+      element: string;
+      description: string;
+      suggestion: string;
+      appearance_count: number;
+    }>(
+      `SELECT id, dimension, element, description, suggestion, appearance_count
+       FROM profile_opportunities
+       WHERE child_id = $1 AND status = 'open'
+       ORDER BY last_appeared_at DESC
+       LIMIT 5`,
+      [childId]
+    );
+    return opportunities;
+  } catch (err) {
+    console.error("Failed to get open opportunities:", err);
+    return [];
+  }
+}
+
+// 保存或更新机会窗口
+async function saveOpportunities(
+  childId: string,
+  recordId: string,
+  opportunityAxis1: { dimension?: string; description?: string; suggestion?: string } | null,
+  opportunityAxis2: { element?: string; description?: string; suggestion?: string } | null
+) {
+  if (!opportunityAxis1 && !opportunityAxis2) return;
+
+  const opportunities = [];
+
+  if (opportunityAxis1?.dimension && opportunityAxis1?.description) {
+    opportunities.push({
+      dimension: opportunityAxis1.dimension,
+      element: null,
+      description: opportunityAxis1.description,
+      suggestion: opportunityAxis1.suggestion || null,
+    });
+  }
+
+  if (opportunityAxis2?.element && opportunityAxis2?.description) {
+    opportunities.push({
+      dimension: null,
+      element: opportunityAxis2.element,
+      description: opportunityAxis2.description,
+      suggestion: opportunityAxis2.suggestion || null,
+    });
+  }
+
+  for (const opp of opportunities) {
+    try {
+      // 检查是否存在相似的开放机会窗口
+      const existing = await queryOne<{ id: string; appearance_count: number }>(
+        `SELECT id, appearance_count FROM profile_opportunities
+         WHERE child_id = $1 AND status = 'open'
+         AND dimension = $2 AND description = $3
+         ORDER BY created_at DESC LIMIT 1`,
+        [childId, opp.dimension, opp.description]
+      );
+
+      if (existing) {
+        // 更新已有窗口
+        await query(
+          `UPDATE profile_opportunities
+           SET last_appeared_at = NOW(),
+               appearance_count = appearance_count + 1,
+               warning_level = CASE
+                 WHEN appearance_count + 1 >= 5 THEN 2
+                 WHEN appearance_count + 1 >= 3 THEN 1
+                 ELSE 0
+               END,
+               source_record_id = $4,
+               updated_at = NOW()
+           WHERE id = $1`,
+          [existing.id, recordId]
+        );
+      } else {
+        // 创建新窗口
+        await query(
+          `INSERT INTO profile_opportunities
+           (child_id, dimension, element, description, suggestion, source_record_id,
+            first_appeared_at, last_appeared_at, appearance_count)
+           VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW(), 1)`,
+          [childId, opp.dimension, opp.element, opp.description, opp.suggestion, recordId]
+        );
+      }
+    } catch (err) {
+      console.error("Failed to save opportunity:", err);
+    }
+  }
+}
+
+// 构建带历史上下文的 prompt
+function buildPromptWithHistory(basePrompt: string, opportunities: { dimension?: string; element?: string; description: string; suggestion?: string; appearance_count: number }[]): string {
+  if (!opportunities || opportunities.length === 0) return basePrompt;
+
+  const historySection = `\n\n【历史关注方向】\n以下方向是之前报告中提到的，持续关注但尚未解决：\n` +
+    opportunities.map((o, i) => {
+      const type = o.dimension ? `维度: ${o.dimension}` : `要素: ${o.element}`;
+      return `${i + 1}. ${type} - ${o.description} (出现 ${o.appearance_count} 次)${o.suggestion ? `\n   建议: ${o.suggestion}` : ''}`;
+    }).join('\n') +
+    `\n\n请在分析时适当呼应这些历史方向，询问家长是否有新的进展或变化。`;
+
+  return basePrompt.replace('禁止说教。禁止空洞的"你做得很好"。', '禁止说教。禁止空洞的"你做得很好"。' + historySection);
+}
+
 export async function POST(req: NextRequest) {
   const auth = getAuthFromRequest(req);
   if (!auth) {
@@ -132,50 +244,27 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const deepseekApi = process.env.DEEPSEEK_API_KEY;
-    if (!deepseekApi) {
-      return NextResponse.json({ error: "服务未配置" }, { status: 500 });
+    // 获取历史机会窗口（仅对 daily intent）
+    let historyOpportunities: { dimension?: string; element?: string; description: string; suggestion?: string; appearance_count: number }[] = [];
+    if (intent === 'daily' && childId) {
+      historyOpportunities = await getOpenOpportunities(childId);
     }
 
     // 根据 intent 选择 prompt
-    const systemPrompt = SYSTEM_PROMPTS[intent] || SYSTEM_PROMPTS.analyze;
+    const basePrompt = SYSTEM_PROMPTS[intent] || SYSTEM_PROMPTS.analyze;
+    const systemPrompt = buildPromptWithHistory(basePrompt, historyOpportunities);
 
-    const response = await fetch("https://api.deepseek.com/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${deepseekApi}`,
-      },
-      body: JSON.stringify({
-        model: "deepseek-chat",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: content },
-        ],
-        max_tokens: 1000,
-        stream: false,
-      }),
+    // 调用 AI
+    const aiResponse = await callAI({
+      messages: [{ role: 'user', content }],
+      systemPrompt,
+      maxTokens: 1000,
     });
 
-    if (!response.ok) {
-      const err = await response.text();
-      return NextResponse.json({ error: err }, { status: 500 });
-    }
-
-    const data = await response.json();
-    const aiContent = data.choices?.[0]?.message?.content || "";
-
     // 解析 AI 返回的 JSON
-    let report;
-    try {
-      const jsonMatch = aiContent.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        report = JSON.parse(jsonMatch[0]);
-      } else {
-        report = { growth_summary: aiContent.substring(0, 100) };
-      }
-    } catch (parseErr) {
-      report = { growth_summary: aiContent.substring(0, 100) };
+    let report = parseAIResponse(aiResponse.content);
+    if (!report) {
+      report = { growth_summary: aiResponse.content.substring(0, 100) };
     }
 
     // 保存记录到数据库
@@ -189,6 +278,16 @@ export async function POST(req: NextRequest) {
           [childId, content, JSON.stringify(report), intent]
         );
         recordId = result[0]?.id;
+
+        // 保存机会窗口（仅对 daily intent）
+        if (intent === 'daily' && recordId) {
+          await saveOpportunities(
+            childId,
+            recordId,
+            report.opportunity_axis1 || null,
+            report.opportunity_axis2 || null
+          );
+        }
       } catch (dbErr) {
         console.error("Failed to save record:", dbErr);
       }
@@ -201,6 +300,8 @@ export async function POST(req: NextRequest) {
       touchPoint: "",
       thinkingShift: "",
       plannedAction: "",
+      // 返回历史机会窗口供前端展示
+      historyOpportunities: historyOpportunities.length > 0 ? historyOpportunities : undefined,
     });
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 });

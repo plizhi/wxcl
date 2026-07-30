@@ -117,13 +117,41 @@ export default function NourishmentPage() {
         </div>
       </div>
 
-      {/* 添加按钮 */}
-      <div className="px-4 py-4">
+      {/* 添加按钮和提取入口 */}
+      <div className="px-4 py-4 flex gap-3">
         <button
           onClick={() => setShowAdd(true)}
-          className="w-full py-3 bg-purple-500 text-white rounded-full text-sm font-medium"
+          className="flex-1 py-3 bg-purple-500 text-white rounded-full text-sm font-medium"
         >
-          + 添加滋养时刻
+          + 添加
+        </button>
+        <button
+          onClick={async () => {
+            if (!currentChildId) return;
+            try {
+              const res = await fetch('/v2/api/nourishment/extract', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${localStorage.getItem('token') || ''}`,
+                },
+                body: JSON.stringify({ limit: 5, childId: currentChildId }),
+              });
+              const data = await res.json();
+              if (data.extractions && data.extractions.length > 0) {
+                alert(`提取到 ${data.extractions.length} 个温暖时刻！`);
+                loadMoments();
+              } else {
+                alert(data.message || '没有新的温暖时刻可提取');
+              }
+            } catch (e) {
+              console.error('提取失败', e);
+              alert('提取失败');
+            }
+          }}
+          className="flex-1 py-3 bg-pink-500 text-white rounded-full text-sm font-medium"
+        >
+          从记录提取
         </button>
       </div>
 

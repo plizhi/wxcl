@@ -113,6 +113,61 @@ export default function ProfilePage() {
 
           {profile ? (
             <div className="p-4 space-y-4">
+              {/* 两套认知体系 */}
+              {profile.aiAnalysis && Object.keys(profile.aiAnalysis).length > 0 && (
+                <div className="mb-4">
+                  <div className="text-xs text-gray-400 mb-2">系统洞察 vs 我的理解</div>
+                  <div className="grid grid-cols-2 gap-2">
+                    {/* 我的理解（家长认知） */}
+                    <div className="bg-amber-50 rounded-xl p-3">
+                      <div className="text-xs font-medium text-amber-600 mb-2">👤 我的理解</div>
+                      <div className="space-y-1">
+                        {profile.personality?.type && (
+                          <p className="text-xs text-gray-600">
+                            性格：{profile.personality.type === 'introvert' ? '内向' : profile.personality.type === 'extrovert' ? '外向' : '混合'}
+                          </p>
+                        )}
+                        {profile.strengths && profile.strengths.length > 0 && (
+                          <p className="text-xs text-gray-600">优势：{profile.strengths[0]}</p>
+                        )}
+                        {profile.growthGoals?.supports && profile.growthGoals.supports.length > 0 && (
+                          <p className="text-xs text-gray-600">支持：{profile.growthGoals.supports[0]}</p>
+                        )}
+                      </div>
+                    </div>
+                    {/* 系统洞察（AI 分析） */}
+                    <div className="bg-gray-100 rounded-xl p-3 opacity-75">
+                      <div className="text-xs font-medium text-gray-600 mb-2">🤖 系统洞察</div>
+                      <div className="space-y-1">
+                        {profile.aiAnalysis.personality && (
+                          <p className="text-xs text-gray-600">
+                            性格：{profile.aiAnalysis.personality.type === 'introvert' ? '内向' : profile.aiAnalysis.personality.type === 'extrovert' ? '外向' : '混合'}
+                          </p>
+                        )}
+                        {profile.aiAnalysis.strengths && profile.aiAnalysis.strengths.length > 0 && (
+                          <p className="text-xs text-gray-600">优势：{profile.aiAnalysis.strengths[0]}</p>
+                        )}
+                        {profile.aiAnalysis.coreNeeds && profile.aiAnalysis.coreNeeds.length > 0 && (
+                          <p className="text-xs text-gray-600">需求：{profile.aiAnalysis.coreNeeds[0]}</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  {/* 权重指示 */}
+                  <div className="mt-2 flex items-center gap-2">
+                    <div className="flex-1 h-1 bg-amber-200 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-amber-500"
+                        style={{ width: `${(profile.parentWeight || 0.5) * 100}%` }}
+                      />
+                    </div>
+                    <span className="text-xs text-gray-400">
+                      家长权重 {(profile.parentWeight || 0.5) * 100 | 0}%
+                    </span>
+                  </div>
+                </div>
+              )}
+
               {/* 性格 */}
               {profile.personality?.type && (
                 <div>
