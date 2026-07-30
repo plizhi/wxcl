@@ -2,11 +2,13 @@
 
 import { useState } from 'react';
 import { useChild } from '@/context/ChildContext';
+import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/components/ui/toast';
 
 export default function QuestionsPage() {
   const { toast } = useToast();
   const { currentChildId } = useChild();
+  const { user } = useAuth();
   const [content, setContent] = useState('');
   const [loading, setLoading] = useState(false);
   const [report, setReport] = useState<any>(null);
@@ -24,7 +26,7 @@ export default function QuestionsPage() {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('token') || ''}`,
         },
-        body: JSON.stringify({ content: content.trim(), intent: 'venting', childId: currentChildId }),
+        body: JSON.stringify({ content: content.trim(), intent: 'venting', childId: currentChildId, parentRole: user?.parentRole }),
       });
 
       const data = await res.json();

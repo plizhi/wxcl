@@ -3,6 +3,24 @@ import { query, queryOne } from "@/lib/db";
 import { getAuthFromRequest } from "@/lib/auth-utils";
 import { callAI, parseAIResponse } from "@/lib/ai";
 
+// 根据用户身份构建 system prompt
+// 支持多种格式：'爸爸'/'妈妈' 或 'dad'/'mom'
+function buildSystemPrompt(basePrompt: string, parentRole?: string): string {
+  if (!parentRole) return basePrompt;
+
+  // 统一转换为判断
+  const isMom = parentRole === '妈妈' || parentRole === 'mom';
+  const isDad = parentRole === '爸爸' || parentRole === 'dad';
+
+  const roleContext = isMom
+    ? '你是「内在结构养育」陪伴顾问，一位理解母亲视角的专业陪伴者。'
+    : isDad
+    ? '你是「内在结构养育」陪伴顾问，一位理解父亲视角的专业陪伴者。'
+    : '你是「内在结构养育」陪伴顾问。';
+
+  return basePrompt.replace('你是「内在结构养育」陪伴顾问。', roleContext);
+}
+
 const SYSTEM_PROMPTS = {
   analyze: `你是「内在结构养育」陪伴顾问。分析今日记录，从以下专业框架给出解读：
 
@@ -44,7 +62,7 @@ const SYSTEM_PROMPTS = {
 
 禁止说教。禁止空洞的"你做得很好"。`,
 
-  venting: `你是「内在结构养育」顾问。家长倾诉了一个困扰，请给予专业理解和回应。
+  venting: `你是「内在结构养育」顾问，一位理解家长倾诉困扰的专业陪伴者。家长倾诉了一个困扰，请给予专业理解和回应。
 
 【内在结构养育的核心原则】
 1. 孩子的问题不是单纯"行为问题"，是身心结构在特定经历下的综合呈现
@@ -222,7 +240,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const { content, childId: requestedChildId, intent = 'daily' } = await req.json();
+    const { content, childId: requestedChildId, intent = 'daily', parentRole } = await req.json();
 
     if (!content || typeof content !== 'string') {
       return NextResponse.json({ code: 400, message: "内容不能为空" }, { status: 400 });
@@ -256,9 +274,9 @@ export async function POST(req: NextRequest) {
       historyOpportunities = await getOpenOpportunities(childId);
     }
 
-    // 根据 intent 选择 prompt
+    // 根据 intent 选择 prompt，并加入用户身份
     const basePrompt = SYSTEM_PROMPTS[intent] || SYSTEM_PROMPTS.analyze;
-    const systemPrompt = buildPromptWithHistory(basePrompt, historyOpportunities);
+    const systemPrompt = buildPromptWithHistory(buildSystemPrompt(basePrompt, parentRole), historyOpportunities);
 
     // 调用 AI
     const aiResponse = await callAI({

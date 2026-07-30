@@ -133,7 +133,7 @@ export default function DailyCarePage() {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('token') || ''}`,
         },
-        body: JSON.stringify({ content: content.trim(), childId: currentChildId }),
+        body: JSON.stringify({ content: content.trim(), childId: currentChildId, parentRole: user?.parentRole }),
       });
 
       const data = await res.json();

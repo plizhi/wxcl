@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { queryOne } from '@/lib/db';
+import { query, queryOne } from '@/lib/db';
 import { getTokenFromHeader, verifyToken } from '@/lib/auth';
 
 export async function GET(request: NextRequest) {
@@ -74,14 +74,34 @@ export async function PATCH(request: NextRequest) {
     const body = await request.json();
     const { nickname, avatarUrl, parentRole } = body;
 
+    // 构建动态更新查询，只更新提供的字段
+    const updates: string[] = [];
+    const values: any[] = [];
+    let paramIndex = 1;
+
+    if (nickname !== undefined) {
+      updates.push(`nickname = $${paramIndex++}`);
+      values.push(nickname || null);
+    }
+    if (avatarUrl !== undefined) {
+      updates.push(`avatar_url = $${paramIndex++}`);
+      values.push(avatarUrl || null);
+    }
+    if (parentRole !== undefined) {
+      updates.push(`parent_role = $${paramIndex++}`);
+      values.push(parentRole || null);
+    }
+
+    if (updates.length === 0) {
+      return NextResponse.json({ code: 0, message: '没有需要更新的字段' });
+    }
+
+    updates.push(`updated_at = NOW()`);
+    values.push(payload.userId);
+
     await query(
-      `UPDATE users SET
-        nickname = COALESCE($1, nickname),
-        avatar_url = COALESCE($2, avatar_url),
-        parent_role = COALESCE($3, parent_role),
-        updated_at = NOW()
-       WHERE id = $4`,
-      [nickname, avatarUrl, parentRole, payload.userId]
+      `UPDATE users SET ${updates.join(', ')} WHERE id = $${paramIndex}`,
+      values
     );
 
     return NextResponse.json({ code: 0, message: '更新成功' });

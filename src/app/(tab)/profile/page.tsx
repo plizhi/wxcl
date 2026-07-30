@@ -21,6 +21,11 @@ export default function ProfilePage() {
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [showAdd, setShowAdd] = useState(false);
   const [editingChild, setEditingChild] = useState<ChildInfo | null>(null);
+  const [showUserEdit, setShowUserEdit] = useState(false);
+  const [userForm, setUserForm] = useState({
+    nickname: '',
+    parentRole: '',
+  });
   const [form, setForm] = useState({
     name: '',
     gender: '',
@@ -65,6 +70,27 @@ export default function ProfilePage() {
     setEditingChild(null);
     setForm({ name: '', gender: '', grade: '', personality: '' });
     setShowAdd(true);
+  }
+
+  function openUserEdit() {
+    setUserForm({
+      nickname: user?.nickname || '',
+      parentRole: user?.parentRole || '',
+    });
+    setShowUserEdit(true);
+  }
+
+  async function handleSaveUser() {
+    try {
+      await userApi.updateUser({
+        nickname: userForm.nickname || undefined,
+        parentRole: userForm.parentRole || undefined,
+      } as any);
+      await fetchUserInfo();
+      setShowUserEdit(false);
+    } catch (e) {
+      console.error('保存失败', e);
+    }
   }
 
   async function handleSave() {
@@ -361,6 +387,26 @@ export default function ProfilePage() {
         </button>
       </div>
 
+      {/* 用户信息入口 */}
+      <div className="mx-4 mt-4 bg-white rounded-2xl shadow-sm overflow-hidden">
+        <button
+          onClick={openUserEdit}
+          className="w-full flex items-center justify-between px-5 py-4"
+        >
+          <div className="flex items-center gap-3">
+            <span className="text-xl">👤</span>
+            <div className="text-left">
+              <p className="text-gray-700">我的信息</p>
+              <p className="text-xs text-gray-400">
+                {user?.parentRole === '爸爸' ? '爸爸' : user?.parentRole === '妈妈' ? '妈妈' : '未设置角色'}
+                {user?.nickname && ` · ${user.nickname}`}
+              </p>
+            </div>
+          </div>
+          <span className="text-gray-400">→</span>
+        </button>
+      </div>
+
       {/* 服务条款 */}
       <div className="mx-4 mt-4 bg-white rounded-2xl shadow-sm overflow-hidden">
         <button className="w-full flex items-center justify-between px-5 py-4">
@@ -436,6 +482,59 @@ export default function ProfilePage() {
                   disabled={!form.gender}
                   className="flex-1 py-3 bg-purple-500 text-white rounded-full text-sm disabled:opacity-50"
                   style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}
+                >
+                  保存
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 用户信息编辑弹窗 */}
+      {showUserEdit && (
+        <div className="fixed inset-0 z-[200] bg-black/50 flex items-end sm:items-center justify-center">
+          <div className="bg-white w-full sm:w-[420px] rounded-t-2xl sm:rounded-2xl p-6">
+            <h3 className="text-lg font-semibold mb-4">编辑我的信息</h3>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm text-gray-600 mb-2">您的角色</label>
+                <div className="flex gap-2">
+                  {['爸爸', '妈妈'].map(r => (
+                    <button
+                      key={r}
+                      onClick={() => setUserForm(f => ({ ...f, parentRole: r }))}
+                      className={`flex-1 py-3 rounded-xl text-sm font-medium border-2 ${
+                        userForm.parentRole === r
+                          ? 'border-amber-500 bg-amber-50 text-amber-600'
+                          : 'border-gray-200 text-gray-700'
+                      }`}
+                    >
+                      {r}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm text-gray-600 mb-2">昵称（选填）</label>
+                <input
+                  type="text"
+                  value={userForm.nickname}
+                  onChange={e => setUserForm(f => ({ ...f, nickname: e.target.value }))}
+                  placeholder="给自己起个昵称"
+                  className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm"
+                />
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setShowUserEdit(false)}
+                  className="flex-1 py-3 border border-gray-200 rounded-full text-gray-500 text-sm"
+                >
+                  取消
+                </button>
+                <button
+                  onClick={handleSaveUser}
+                  className="flex-1 py-3 bg-amber-500 text-white rounded-full text-sm"
                 >
                   保存
                 </button>
