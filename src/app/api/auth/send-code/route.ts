@@ -22,8 +22,7 @@ export async function POST(request: NextRequest) {
       [phone, code, expiresAt]
     );
 
-    // TODO: 实际发送短信，这里先打印
-    console.log(`[验证码] ${phone}: ${code}`);
+    // 实际发送短信（生产环境应接入短信网关）
 
     return NextResponse.json({
       code: 0,

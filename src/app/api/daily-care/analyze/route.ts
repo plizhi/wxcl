@@ -224,8 +224,14 @@ export async function POST(req: NextRequest) {
   try {
     const { content, childId: requestedChildId, intent = 'daily' } = await req.json();
 
-    if (!content) {
-      return NextResponse.json({ error: "content is required" }, { status: 400 });
+    if (!content || typeof content !== 'string') {
+      return NextResponse.json({ code: 400, message: "内容不能为空" }, { status: 400 });
+    }
+
+    // 限制内容长度
+    const maxLength = 2000;
+    if (content.length > maxLength) {
+      return NextResponse.json({ code: 400, message: `内容不能超过${maxLength}字` }, { status: 400 });
     }
 
     let childId = requestedChildId;
@@ -304,6 +310,7 @@ export async function POST(req: NextRequest) {
       historyOpportunities: historyOpportunities.length > 0 ? historyOpportunities : undefined,
     });
   } catch (err) {
-    return NextResponse.json({ error: String(err) }, { status: 500 });
+    console.error('Analyze error:', err);
+    return NextResponse.json({ code: 500, message: "分析失败，请稍后重试" }, { status: 500 });
   }
 }

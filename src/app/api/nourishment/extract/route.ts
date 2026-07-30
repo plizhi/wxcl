@@ -134,6 +134,7 @@ export async function POST(req: NextRequest) {
       processedRecords: records.length,
     });
   } catch (err) {
-    return NextResponse.json({ error: String(err) }, { status: 500 });
+    console.error('Extract error:', err);
+    return NextResponse.json({ code: 500, message: "提取失败，请稍后重试" }, { status: 500 });
   }
 }
