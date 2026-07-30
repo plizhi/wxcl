@@ -2,7 +2,6 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { authApi, userApi } from '@/lib/api';
-import { wsService } from '@/lib/websocket';
 import type { User } from '@/lib/types';
 
 interface AuthContextType {
@@ -27,7 +26,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const storedToken = localStorage.getItem('token');
     if (storedToken) {
       setToken(storedToken);
-      wsService.connect(storedToken);
     }
     setIsLoading(false);
   }, []);
@@ -39,7 +37,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem('token', data.token);
     localStorage.setItem('userId', data.userId);
     setToken(data.token);
-    wsService.connect(data.token);
     try {
       const userData = await userApi.getCurrentUser();
       setUser(userData);
@@ -53,7 +50,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.removeItem('userId');
     setToken(null);
     setUser(null);
-    wsService.disconnect();
   }, []);
 
   const fetchUserInfo = useCallback(async () => {
