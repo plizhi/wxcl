@@ -30,6 +30,7 @@ export default function QuestionsPage() {
       const data = await res.json();
       if (data.understanding || data.summary || data.analysis) {
         setReport(data);
+        setContent(''); // 清空输入框
         toast('记录成功', 'success');
       } else {
         toast('记录失败', 'error');

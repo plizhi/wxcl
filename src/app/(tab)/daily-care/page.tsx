@@ -137,8 +137,9 @@ export default function DailyCarePage() {
       });
 
       const data = await res.json();
-      if (data.growth_summary || data.strengths) {
+      if (data.understanding || data.summary || data.strengths || data.growth_summary) {
         setReport(data);
+        setContent(''); // 清空输入框
         await loadRecords();
         toast('记录成功', 'success');
         // 检查是否需要引导
