@@ -166,7 +166,7 @@ export default function OnboardingPage() {
               <div className="bg-amber-50 rounded-2xl p-5">
                 <h3 className="text-sm font-medium text-amber-600 mb-2">💎 亮点发现</h3>
                 <ul className="text-xs text-gray-700 space-y-1">
-                  {initialReport.strengths.map((s, i) => <li key={i}>• {s}</li>)}
+                  {initialReport.strengths.map((s: string, i: number) => <li key={i}>• {s}</li>)}
                 </ul>
               </div>
             )}

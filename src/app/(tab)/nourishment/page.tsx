@@ -273,7 +273,7 @@ export default function NourishmentPage() {
                   <p className="text-xs text-purple-600 bg-purple-50 rounded-lg px-3 py-2 inline-block">{item.feeling}</p>
                 )}
                 <p className="text-xs text-gray-400 mt-2">
-                  {new Date(item.createdAt).toLocaleDateString('zh-CN', { month: 'long', day: 'numeric' })}
+                  {item.createdAt && new Date(item.createdAt).toLocaleDateString('zh-CN', { month: 'long', day: 'numeric' })}
                 </p>
               </div>
             ))}

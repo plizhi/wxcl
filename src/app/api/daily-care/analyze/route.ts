@@ -275,7 +275,7 @@ export async function POST(req: NextRequest) {
     }
 
     // 根据 intent 选择 prompt，并加入用户身份
-    const basePrompt = SYSTEM_PROMPTS[intent] || SYSTEM_PROMPTS.analyze;
+    const basePrompt = (SYSTEM_PROMPTS as Record<string, string>)[intent] || SYSTEM_PROMPTS.analyze;
     const systemPrompt = buildPromptWithHistory(buildSystemPrompt(basePrompt, parentRole), historyOpportunities);
 
     // 调用 AI

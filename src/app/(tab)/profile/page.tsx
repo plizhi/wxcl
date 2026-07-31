@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { useChild } from '@/context/ChildContext';
-import { userApi, profileApi, ProfileData } from '@/lib/api';
+import { userApi } from '@/lib/api';
 
 interface ChildInfo {
   id: string;
@@ -18,7 +18,6 @@ export default function ProfilePage() {
   const router = useRouter();
   const { user, fetchUserInfo, logout, isLoading } = useAuth();
   const { currentChild, currentChildId, childrenList, setCurrentChild, refreshChildren } = useChild();
-  const [profile, setProfile] = useState<ProfileData | null>(null);
   const [showAdd, setShowAdd] = useState(false);
   const [editingChild, setEditingChild] = useState<ChildInfo | null>(null);
   const [showUserEdit, setShowUserEdit] = useState(false);
@@ -37,21 +36,6 @@ export default function ProfilePage() {
     fetchUserInfo();
     refreshChildren();
   }, [fetchUserInfo, refreshChildren]);
-
-  useEffect(() => {
-    if (currentChildId) {
-      loadProfile(currentChildId);
-    }
-  }, [currentChildId]);
-
-  async function loadProfile(childId: string) {
-    try {
-      const { profile: p } = await profileApi.getProfile(childId);
-      setProfile(p);
-    } catch (e) {
-      console.error('加载画像失败', e);
-    }
-  }
 
   if (isLoading) {
     return (
@@ -97,7 +81,7 @@ export default function ProfilePage() {
     if (!form.gender) return;
     try {
       if (editingChild?.id) {
-        await userApi.updateChild(editingChild.id, form);
+        await userApi.updateChild(editingChild.id, form as any);
       } else {
         await userApi.saveChild(form as any);
       }
@@ -108,171 +92,12 @@ export default function ProfilePage() {
     }
   }
 
-  // 判断画像是否完整
-  const profileComplete = profile && (
-    (profile.personality?.type && profile.personality.type !== '') ||
-    (profile.interests && profile.interests.length > 0) ||
-    (profile.strengths && profile.strengths.length > 0)
-  );
-
   return (
     <div className="min-h-screen bg-gradient-to-b from-amber-50 to-white pb-20">
       {/* Header */}
       <div className="sticky top-0 bg-white/90 backdrop-blur z-10 border-b border-gray-100">
         <div className="flex items-center justify-center px-4 h-14">
           <h1 className="text-lg font-medium">👤 我的</h1>
-        </div>
-      </div>
-
-      {/* 孩子画像卡片 */}
-      <div className="mx-4 mt-4">
-        <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
-          <div className="px-4 py-3 border-b border-gray-100 flex justify-between items-center">
-            <h2 className="text-sm font-medium text-gray-500">孩子画像</h2>
-            <button
-              onClick={() => router.push(`/profile/setup?childId=${currentChildId}`)}
-              className="text-xs text-amber-500"
-            >
-              {profileComplete ? '编辑' : '去完善'}
-            </button>
-          </div>
-
-          {profile ? (
-            <div className="p-4 space-y-4">
-              {/* 两套认知体系 */}
-              {profile.aiAnalysis && Object.keys(profile.aiAnalysis).length > 0 && (
-                <div className="mb-4">
-                  <div className="text-xs text-gray-400 mb-2">系统洞察 vs 我的理解</div>
-                  <div className="grid grid-cols-2 gap-2">
-                    {/* 我的理解（家长认知） */}
-                    <div className="bg-amber-50 rounded-xl p-3">
-                      <div className="text-xs font-medium text-amber-600 mb-2">👤 我的理解</div>
-                      <div className="space-y-1">
-                        {profile.personality?.type && (
-                          <p className="text-xs text-gray-600">
-                            性格：{profile.personality.type === 'introvert' ? '内向' : profile.personality.type === 'extrovert' ? '外向' : '混合'}
-                          </p>
-                        )}
-                        {profile.strengths && profile.strengths.length > 0 && (
-                          <p className="text-xs text-gray-600">优势：{profile.strengths[0]}</p>
-                        )}
-                        {profile.growthGoals?.supports && profile.growthGoals.supports.length > 0 && (
-                          <p className="text-xs text-gray-600">支持：{profile.growthGoals.supports[0]}</p>
-                        )}
-                      </div>
-                    </div>
-                    {/* 系统洞察（AI 分析） */}
-                    <div className="bg-gray-100 rounded-xl p-3 opacity-75">
-                      <div className="text-xs font-medium text-gray-600 mb-2">🤖 系统洞察</div>
-                      <div className="space-y-1">
-                        {profile.aiAnalysis.personality && (
-                          <p className="text-xs text-gray-600">
-                            性格：{profile.aiAnalysis.personality.type === 'introvert' ? '内向' : profile.aiAnalysis.personality.type === 'extrovert' ? '外向' : '混合'}
-                          </p>
-                        )}
-                        {profile.aiAnalysis.strengths && profile.aiAnalysis.strengths.length > 0 && (
-                          <p className="text-xs text-gray-600">优势：{profile.aiAnalysis.strengths[0]}</p>
-                        )}
-                        {profile.aiAnalysis.coreNeeds && profile.aiAnalysis.coreNeeds.length > 0 && (
-                          <p className="text-xs text-gray-600">需求：{profile.aiAnalysis.coreNeeds[0]}</p>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                  {/* 权重指示 */}
-                  <div className="mt-2 flex items-center gap-2">
-                    <div className="flex-1 h-1 bg-amber-200 rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-amber-500"
-                        style={{ width: `${(profile.parentWeight || 0.5) * 100}%` }}
-                      />
-                    </div>
-                    <span className="text-xs text-gray-400">
-                      家长权重 {(profile.parentWeight || 0.5) * 100 | 0}%
-                    </span>
-                  </div>
-                </div>
-              )}
-
-              {/* 性格 */}
-              {profile.personality?.type && (
-                <div>
-                  <div className="text-xs text-gray-400 mb-1">性格特质</div>
-                  <div className="flex gap-2 flex-wrap">
-                    <span className="px-3 py-1 bg-amber-100 text-amber-700 rounded-full text-sm">
-                      {profile.personality.type === 'introvert' ? '内向型' :
-                       profile.personality.type === 'extrovert' ? '外向型' : '混合型'}
-                    </span>
-                    {profile.personality.details?.map((d, i) => (
-                      <span key={i} className="px-2 py-1 bg-gray-100 text-gray-600 rounded-full text-xs">{d}</span>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* 兴趣爱好 */}
-              {profile.interests && profile.interests.length > 0 && (
-                <div>
-                  <div className="text-xs text-gray-400 mb-1">兴趣爱好</div>
-                  <div className="flex gap-2 flex-wrap">
-                    {profile.interests.map((interest, i) => (
-                      <span key={i} className="px-3 py-1 bg-purple-100 text-purple-700 rounded-full text-sm">{interest}</span>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* 优势强项 */}
-              {profile.strengths && profile.strengths.length > 0 && (
-                <div>
-                  <div className="text-xs text-gray-400 mb-1">优势强项</div>
-                  <div className="space-y-1">
-                    {profile.strengths.map((s, i) => (
-                      <div key={i} className="flex items-center gap-2 text-sm text-gray-700">
-                        <span className="text-amber-500">✨</span> {s}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* 支持方向 */}
-              {profile.growthGoals?.supports && profile.growthGoals.supports.length > 0 && (
-                <div>
-                  <div className="text-xs text-gray-400 mb-1">支持方向</div>
-                  <div className="space-y-1">
-                    {profile.growthGoals.supports.map((s, i) => (
-                      <div key={i} className="flex items-center gap-2 text-sm text-gray-700">
-                        <span className="text-purple-500">💜</span> {s}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {!profileComplete && (
-                <div className="text-center py-4 text-gray-400">
-                  <p className="text-sm">还没有填写画像</p>
-                  <button
-                    onClick={() => router.push(`/profile/setup?childId=${currentChildId}`)}
-                    className="mt-2 text-amber-500 text-sm"
-                  >
-                    去完善 →
-                  </button>
-                </div>
-              )}
-            </div>
-          ) : (
-            <div className="p-6 text-center">
-              <p className="text-sm text-gray-400 mb-4">还没有孩子画像</p>
-              <button
-                onClick={() => router.push(`/profile/setup?childId=${currentChildId}`)}
-                className="px-6 py-2 bg-amber-500 text-white rounded-full text-sm"
-              >
-                去创建
-              </button>
-            </div>
-          )}
         </div>
       </div>
 

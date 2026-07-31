@@ -16,7 +16,7 @@ export interface User {
 }
 
 export interface ChildProfile {
-  id?: number;
+  id?: string;
   name?: string;
   gender: 'boy' | 'girl' | '';
   grade: string;
@@ -149,11 +149,20 @@ export interface DailyCareRecord {
   childId: string;
   content: string;
   reply: any;
-  intent: string;
+  report?: DailyCareReport;
   createdAt: string;
+  growthSummary?: string;
+  touchPoint?: string;
+  thinkingShift?: string;
+  plannedAction?: string;
+  intent: string;
 }
 
 export interface DailyCareReport {
+  recordId?: number;
+  axis1?: Record<string, { growth_state: string; description: string }>;
+  axis2?: Record<string, { parent_state: string; child_state: string; description: string }>;
+  growth_summary?: string;
   strengths?: string[];
   opportunity_axis1?: {
     dimension: string;
@@ -166,5 +175,8 @@ export interface DailyCareReport {
     suggestion: string;
   };
   advice?: string;
-  growth_summary?: string;
+  reflection_prompt?: string;
+  no_records?: boolean;
+  message?: string;
+  error?: string;
 }

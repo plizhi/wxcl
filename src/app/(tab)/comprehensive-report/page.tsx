@@ -341,7 +341,7 @@ export default function ComprehensiveReportPage() {
     const { startDate, endDate } = getDateRange();
 
     try {
-      const result = await dailyCareApi.getComprehensive(currentChildId, startDate, endDate);
+      const result = await dailyCareApi.getComprehensive(currentChildId ?? undefined, startDate, endDate);
       if (result.error) {
         toast(result.error, 'error');
       } else {
@@ -486,7 +486,7 @@ export default function ComprehensiveReportPage() {
               <div className="mb-4 p-3 bg-amber-50 rounded-xl">
                 <h3 className="text-sm font-medium text-amber-600 mb-2">💎 综合亮点</h3>
                 <ul className="text-xs text-gray-700 space-y-1">
-                  {report.strengths.map((s, i) => <li key={i}>• {s}</li>)}
+                  {report.strengths.map((s: string, i: number) => <li key={i}>• {s}</li>)}
                 </ul>
               </div>
             )}

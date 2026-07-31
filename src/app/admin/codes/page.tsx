@@ -163,7 +163,7 @@ export default function AdminCodesPage() {
               <input
                 type="number"
                 value={count}
-                onChange={e => setCount(e.target.value)}
+                onChange={e => setCount(parseInt(e.target.value) || 1)}
                 min={1}
                 max={100}
                 className="px-4 py-2 border rounded-lg w-24"

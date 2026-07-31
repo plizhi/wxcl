@@ -63,8 +63,21 @@ export default function AddChildPage() {
     }
   }
 
-  function handleSkip() {
-    // 跳过直接进入首页
+  async function handleSkip() {
+    // 跳过时创建默认孩子档案，避免记录时找不到孩子
+    try {
+      const child = await userApi.saveChild({
+        name: '',
+        gender: '',
+        birthDate: undefined,
+      } as any);
+      await refreshChildren();
+      if (child?.id) {
+        setCurrentChild(child as any);
+      }
+    } catch (e) {
+      console.error('创建默认孩子档案失败', e);
+    }
     router.replace('/');
   }
 

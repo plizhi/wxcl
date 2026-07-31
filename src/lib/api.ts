@@ -1,5 +1,8 @@
 import type { ApiResponse, User, ChildProfile, DailyCareRecord, DailyCareReport, Question } from './types';
 
+// Re-export types for backwards compatibility
+export type { DailyCareRecord, DailyCareReport };
+
 function getToken(): string | null {
   if (typeof window === 'undefined') return null;
   return localStorage.getItem('token');
@@ -67,9 +70,9 @@ export const userApi = {
   getChildren: () => request<ChildProfile[]>('/api/children'),
   saveChild: (data: Omit<ChildProfile, 'id'>) =>
     request<ChildProfile>('/api/children', { method: 'POST', body: JSON.stringify(data) }),
-  updateChild: (id: number, data: Partial<ChildProfile>) =>
+  updateChild: (id: string | number, data: Partial<ChildProfile>) =>
     request<ChildProfile>('/api/children', { method: 'PUT', body: JSON.stringify({ id, ...data }) }),
-  deleteChild: (id: number) =>
+  deleteChild: (id: string | number) =>
     request(`/api/children?id=${id}`, { method: 'DELETE' }),
 };
 
@@ -86,33 +89,6 @@ export const questionApi = {
   submitFeedback: (id: string, feedback: string) =>
     request(`/api/questions/${id}/feedback`, { method: 'POST', body: JSON.stringify({ feedback }) }),
 };
-
-// Daily Care API
-export interface DailyCareRecord {
-  id: number;
-  content: string;
-  report?: DailyCareReport;
-  createdAt: string;
-  growthSummary?: string;
-  touchPoint?: string;
-  thinkingShift?: string;
-  plannedAction?: string;
-}
-
-export interface DailyCareReport {
-  recordId?: number;
-  axis1?: Record<string, { growth_state: string; description: string }>;
-  axis2?: Record<string, { parent_state: string; child_state: string; description: string }>;
-  growth_summary?: string;
-  strengths?: string[];
-  opportunity_axis1?: { dimension: string; description: string; suggestion: string };
-  opportunity_axis2?: { element: string; description: string; suggestion: string };
-  advice?: string;
-  reflection_prompt?: string;
-  no_records?: boolean;
-  message?: string;
-  error?: string;
-}
 
 export const dailyCareApi = {
   analyze: (content: string, recordDate?: string) =>

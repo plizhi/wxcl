@@ -4,9 +4,9 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 import { userApi } from '@/lib/api';
 
 export interface Child {
-  id: string;
-  name: string;
-  gender: 'boy' | 'girl';
+  id?: string;
+  name?: string;
+  gender?: 'boy' | 'girl';
   birth_date?: string;
   grade?: string;
   created_at?: string;
@@ -43,7 +43,7 @@ export function ChildProvider({ children }: { children: React.ReactNode }) {
 
     try {
       const res = await userApi.getChildren();
-      const list: Child[] = res || [];
+      const list: Child[] = (res || []) as Child[];
       setChildrenList(list);
 
       // 如果没有当前孩子，设置第一个
@@ -56,9 +56,9 @@ export function ChildProvider({ children }: { children: React.ReactNode }) {
           setCurrentChildState(storedChild);
         } else {
           // 默认选择第一个孩子
-          setCurrentChildId(list[0].id);
+          setCurrentChildId(list[0].id || null);
           setCurrentChildState(list[0]);
-          localStorage.setItem(CURRENT_CHILD_KEY, list[0].id);
+          localStorage.setItem(CURRENT_CHILD_KEY, list[0].id || '');
         }
       } else {
         setCurrentChildId(null);
@@ -83,9 +83,9 @@ export function ChildProvider({ children }: { children: React.ReactNode }) {
 
   // 切换当前孩子
   const setCurrentChild = useCallback((child: Child) => {
-    setCurrentChildId(child.id);
+    setCurrentChildId(child.id || null);
     setCurrentChildState(child);
-    localStorage.setItem(CURRENT_CHILD_KEY, child.id);
+    localStorage.setItem(CURRENT_CHILD_KEY, child.id || '');
   }, []);
 
   // 初始化加载
