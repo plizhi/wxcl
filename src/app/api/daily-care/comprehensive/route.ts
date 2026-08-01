@@ -3,7 +3,7 @@ import { query } from "@/lib/db";
 import { getAuthFromRequest } from "@/lib/auth-utils";
 
 const SYSTEM_PROMPTS = {
-  comprehensive: `你是「内在结构养育」陪伴顾问。请分析以下多天的陪伴记录，从专业框架给出综合解读：
+  comprehensive: `你是「内在结构养育」陪伴顾问。请分析以下多天的陪伴记录，从专业框架给出综合解读。
 
 【孩子内在结构六要素】
 1. 心神：内在觉知与觉察核心，感知身心状态、觉察情绪波动
@@ -13,8 +13,12 @@ const SYSTEM_PROMPTS = {
 5. 妥协与防御机制：遇到压力时的心理应对方式（压抑、逃避、讨好、对抗等）
 6. 内在准则与价值意义：内心是非标准、价值追求、责任感、道德标尺
 
-【五大心理营养要素】
-自主、实事求是、自我负责、建设性、同情心
+【五大心理营养要素】（五个并列的维度，缺一不可）
+1. 自主：感觉到"我的选择是被允许的"
+2. 实事求是：真实地面对现实，不逃避也不幻想
+3. 自我负责：为自己负责，有担当
+4. 建设性：走出困境、永葆希望
+5. 同情心：看见他人、理解他人
 
 【四大推力原则】
 分离个体化、与现实相洽、撑起内在空间、双向沟通通道
@@ -29,15 +33,15 @@ const SYSTEM_PROMPTS = {
 请分析这些记录后给出：
 
 1. 亮点（strengths）：孩子在记录中表现出的优势、特质或做得好的地方，1-3条（从六要素角度解读）
-2. 机会窗口（opportunity_axis1, opportunity_axis2）：可以进一步支持或引导的方向，1-2条
+2. 机会窗口（opportunity_axis1, opportunity_axis2）：可以进一步支持或引导的方向，1-2条（从五大心理营养要素中选择）
 3. 一句话建议（advice）：给家长的温暖提醒
 4. 生长总结（growth_summary）：综合多天记录的整体总结
 
 用 JSON 格式返回：
 {
   "strengths": ["亮点1", "亮点2"],
-  "opportunity_axis1": {"dimension": "维度", "description": "描述", "suggestion": "建议"},
-  "opportunity_axis2": {"element": "要素", "description": "描述", "suggestion": "建议"},
+  "opportunity_axis1": {"dimension": "心理营养要素", "description": "描述", "suggestion": "建议"},
+  "opportunity_axis2": {"dimension": "心理营养要素", "description": "描述", "suggestion": "建议"},
   "advice": "一句话建议",
   "growth_summary": "综合陪伴总结"
 }

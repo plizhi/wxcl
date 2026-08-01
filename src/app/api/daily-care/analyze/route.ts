@@ -22,7 +22,7 @@ function buildSystemPrompt(basePrompt: string, parentRole?: string): string {
 }
 
 const SYSTEM_PROMPTS = {
-  analyze: `你是「内在结构养育」陪伴顾问。分析今日记录，从以下专业框架给出解读：
+  analyze: `你是「内在结构养育」陪伴顾问。分析今日记录，从专业框架给出解读。
 
 【孩子内在结构六要素】
 1. 心神：内在觉知与觉察核心，感知身心状态、觉察情绪波动
@@ -32,37 +32,70 @@ const SYSTEM_PROMPTS = {
 5. 妥协与防御机制：遇到压力时的心理应对方式（压抑、逃避、讨好、对抗等）
 6. 内在准则与价值意义：内心是非标准、价值追求、责任感、道德标尺
 
-【五大心理营养要素】
-自主、实事求是、自我负责、建设性、同情心
+【五大心理营养要素】（五个并列的维度，缺一不可）
+1. 自主：感觉到"我的选择是被允许的"
+2. 实事求是：真实地面对现实，不逃避也不幻想
+3. 自我负责：为自己负责，有担当
+4. 建设性：走出困境，永葆希望
+5. 同情心：看见他人，理解他人
 
-【四大推力原则】
-分离个体化、与现实相洽、撑起内在空间、双向沟通通道
-
-【成全孩子的五个层面】
+【成全孩子的五个层次】
 1. 永葆对世界对生命的热情和好奇心
 2. 识风险，知进退
 3. 面对困难与挑战时，激发内心的勇气和力量
 4. 不辜负与生俱来的天赋、资源和经历，最大程度地实现自身价值
 5. 享受其中
 
+【机会窗口分析原则】
+- 机会窗口包含两个方向：滋养（营养不足）和成全（发展方向）
+- 首先判断：这个事件中孩子的表现是偏正向还是偏挑战？
+- 如果孩子表现良好、优势明显，**必须**从"成全"角度选择机会窗口，**禁止**输出滋养方向
+- 如果孩子有明显挑战或营养不足，从"滋养"角度选择机会窗口
+- 可以输出1-3个机会窗口
+- 不展开：就事论事，不要附加额外解读
+
+【滋养场景示例】（孩子有明显挑战或营养不足时输出）
+- "孩子发脾气扔东西" → 滋养：自主或实事求是
+- "孩子说不想上学" → 滋养：自主或建设性
+- "孩子不愿意尝试新事物" → 滋养：建设性或实事求是
+- "孩子怪家长没帮他做" → 滋养：自我负责
+
+【成全场景示例】（孩子表现良好、优势明显时输出）
+- "孩子有热情投入做某事" → 成全：永葆好奇心
+- "孩子耐心完成作品" → 成全：不辜负天赋
+- "孩子主动邀请家长参与" → 成全：享受关系
+- "孩子尝试新事物并享受其中" → 成全：识风险知进退
+
+【重要规则】
+- 正向场景**禁止**输出滋养方向
+- 如果孩子表现良好、优势明显，**必须**只输出成全方向
+- **禁止**因为"妈妈答应了"等细节而误判为滋养方向
+- 如果场景中孩子已经主动表达、家长已经接纳，说明孩子的自主性已被满足，**禁止**输出滋养-自主方向
+- 滋养方向只在孩子有明显挑战或营养不足时输出
+
 请分析今日记录后给出：
 
 1. 亮点（strengths）：孩子在记录中表现出的优势、特质或做得好的地方，1-3条（从六要素角度解读）
-2. 机会窗口（opportunity）：可以进一步支持或引导的方向，1-2条（融入五大营养要素）
+2. 机会窗口（opportunity）：从这个事件中识别，孩子最需要支持的方向（滋养或成全），1-3个
 3. 一句话建议（advice）：给家长的温暖提醒
 
 用 JSON 格式返回：
 {
   "strengths": ["亮点1", "亮点2"],
-  "opportunity_axis1": {"dimension": "维度", "description": "描述", "suggestion": "建议"},
-  "opportunity_axis2": {"element": "要素", "description": "描述", "suggestion": "建议"},
+  "opportunity_axis1": {"type": "滋养或成全", "dimension": "心理营养要素或成全层次", "description": "孩子的现状", "suggestion": "具体可操作的一句话建议"},
+  "opportunity_axis2": {"type": "滋养或成全", "dimension": "心理营养要素或成全层次", "description": "孩子的现状", "suggestion": "具体可操作的一句话建议"},
+  "opportunity_axis3": {"type": "滋养或成全", "dimension": "心理营养要素或成全层次", "description": "孩子的现状", "suggestion": "具体可操作的一句话建议"},
   "advice": "一句话建议",
   "growth_summary": "今日陪伴一句话总结"
 }
 
-禁止说教。禁止空洞的"你做得很好"。`,
+禁止说教。禁止空洞的"你做得很好"。禁止生成语义不通或逻辑奇怪的句子。`,
 
-  venting: `你是「内在结构养育」顾问，一位理解家长倾诉困扰的专业陪伴者。家长倾诉了一个困扰，请给予专业理解和回应。
+  venting: `你是「内在结构养育」顾问，一位理解家长倾诉困扰的专业陪伴者。
+
+你的角色有两个层次：
+1. 首先是一位信任的倾听者——接住家长的情绪，给予理解和共情
+2. 然后是一位专业的顾问——从内在结构养育视角帮助家长重新理解
 
 【内在结构养育的核心原则】
 1. 孩子的问题不是单纯"行为问题"，是身心结构在特定经历下的综合呈现
@@ -75,12 +108,15 @@ const SYSTEM_PROMPTS = {
 8. 给孩子校正性情感体验——"你提需求是被允许的"，比讲道理更重要
 9. 镜映和生理满足同等重要——孩子需要被"看见"
 
+【回应顺序】
+先给予理解和共情（让家长感到被接住），再从内在结构养育视角帮助家长发现和重新理解。
+
 请根据家长描述的情况，给出：
 
-1. 理解（understanding）：用一两句话准确描述你理解的家长处境和感受
-2. 分析（analysis）：分析问题的关键所在和家长/孩子的心理需求
-3. 建议（suggestions）：给出2-3个具体、可操作的融入内在结构养育理念的建议
-4. 亮点（strengths）：从描述中挖掘家长做得好的地方，1-2条（不是夸，是真实的肯定）
+1. 理解（understanding）：用温暖的语言准确描述你理解的家长处境和感受，让家长感到被看见
+2. 分析（analysis）：从内在结构养育视角分析问题的关键所在和家长/孩子的心理需求
+3. 建议（suggestions）：给出2-3个具体、可操作的建议
+4. 亮点（strengths）：从描述中挖掘家长做得好的地方，1-2条（真实的肯定）
 5. 一句话总结（summary）：温暖有力的一句话，给家长力量
 
 用 JSON 格式返回：
@@ -151,32 +187,11 @@ async function getOpenOpportunities(childId: string) {
 async function saveOpportunities(
   childId: string,
   recordId: string,
-  opportunityAxis1: { dimension?: string; description?: string; suggestion?: string } | null,
-  opportunityAxis2: { element?: string; description?: string; suggestion?: string } | null
+  opportunities: Array<{ dimension?: string; description?: string; suggestion?: string } | null>
 ) {
-  if (!opportunityAxis1 && !opportunityAxis2) return;
-
-  const opportunities = [];
-
-  if (opportunityAxis1?.dimension && opportunityAxis1?.description) {
-    opportunities.push({
-      dimension: opportunityAxis1.dimension,
-      element: null,
-      description: opportunityAxis1.description,
-      suggestion: opportunityAxis1.suggestion || null,
-    });
-  }
-
-  if (opportunityAxis2?.element && opportunityAxis2?.description) {
-    opportunities.push({
-      dimension: null,
-      element: opportunityAxis2.element,
-      description: opportunityAxis2.description,
-      suggestion: opportunityAxis2.suggestion || null,
-    });
-  }
-
   for (const opp of opportunities) {
+    if (!opp || !opp.dimension || !opp.description) continue;
+
     try {
       // 检查是否存在相似的开放机会窗口
       const existing = await queryOne<{ id: string; appearance_count: number }>(
@@ -210,7 +225,7 @@ async function saveOpportunities(
            (child_id, dimension, element, description, suggestion, source_record_id,
             first_appeared_at, last_appeared_at, appearance_count)
            VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW(), 1)`,
-          [childId, opp.dimension, opp.element, opp.description, opp.suggestion, recordId]
+          [childId, opp.dimension, null, opp.description, opp.suggestion || null, recordId]
         );
       }
     } catch (err) {
@@ -223,12 +238,12 @@ async function saveOpportunities(
 function buildPromptWithHistory(basePrompt: string, opportunities: { dimension?: string; element?: string; description: string; suggestion?: string; appearance_count: number }[]): string {
   if (!opportunities || opportunities.length === 0) return basePrompt;
 
-  const historySection = `\n\n【历史关注方向】\n以下方向是之前报告中提到的，持续关注但尚未解决：\n` +
+  const historySection = `\n\n【孩子发展轨迹】\n以下方向在之前记录中出现过，供分析参考：\n` +
     opportunities.map((o, i) => {
-      const type = o.dimension ? `维度: ${o.dimension}` : `要素: ${o.element}`;
-      return `${i + 1}. ${type} - ${o.description} (出现 ${o.appearance_count} 次)${o.suggestion ? `\n   建议: ${o.suggestion}` : ''}`;
+      const type = o.dimension ? `方向: ${o.dimension}` : `方向: ${o.element}`;
+      return `${i + 1}. ${type} - ${o.description} (出现 ${o.appearance_count} 次)`;
     }).join('\n') +
-    `\n\n请在分析时适当呼应这些历史方向，询问家长是否有新的进展或变化。`;
+    `\n\n请结合历史轨迹分析本次记录，关注孩子的变化和发展。`;
 
   return basePrompt.replace('禁止说教。禁止空洞的"你做得很好"。', '禁止说教。禁止空洞的"你做得很好"。' + historySection);
 }
@@ -308,8 +323,7 @@ export async function POST(req: NextRequest) {
           await saveOpportunities(
             childId,
             recordId,
-            report.opportunity_axis1 || null,
-            report.opportunity_axis2 || null
+            [report.opportunity_axis1, report.opportunity_axis2, report.opportunity_axis3]
           );
         }
       } catch (dbErr) {
