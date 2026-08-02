@@ -467,6 +467,22 @@ location /v2 {
 - 考虑简化架构：让乌服直接对外 HTTPS
 - 或在港服和乌服之间建立内网专线
 
+### 港服 nginx 配置安全规范
+
+**修改前：**
+- 先备份：`sudo cp /etc/nginx/nginx.conf /etc/nginx/nginx.conf.bak.$(date +%Y%m%d%H%M%S)`
+
+**修改原则：**
+- 只追加新 server 块，不修改现有配置
+- 使用 `nginx -t` 验证语法后再 reload
+- 用 `nginx -s reload` 而非 restart，避免中断连接
+
+**操作步骤：**
+1. 备份现有配置
+2. 追加新 server 块到 nginx.conf
+3. `sudo nginx -t` 验证语法
+4. `sudo nginx -s reload`
+
 ---
 
 ## 六、产品哲学（2026-07-31 补充）
