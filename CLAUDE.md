@@ -4,6 +4,14 @@
 
 ---
 
+## ⚠️ 重要提醒
+
+**开发工作目录**：`/home/pupeng/projects/wxcl-v2-dev/`（worktree）
+
+**不要在** `/home/pupeng/projects/wxcl-v2/` **进行开发**，那是生产环境。
+
+---
+
 ## 行为边界（必须遵守）
 
 **端口操作**：
