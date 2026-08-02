@@ -417,9 +417,10 @@ AI 回复时参考画像 → 更个性化建议
 
 | 项目 | 值 |
 |------|-----|
-| 代码位置（开发） | `/home/pupeng/wxcl-v2-dev/`（worktree） |
+| 代码位置（开发） | `/home/pupeng/projects/wxcl-v2-dev/`（worktree） |
 | 分支 | dev-work |
 | 服务端口 | 3008 |
+| 访问 URL | http://wxcl.nzyy.ltd/v2 |
 | 数据库（开发） | PostgreSQL wxcl_dev |
 | 测试账号 | 13800138000 |
 
@@ -427,6 +428,7 @@ AI 回复时参考画像 → 更个性化建议
 - 生产环境受 systemd 管理，代码更新后 `sudo systemctl restart wxcl-v2.service`
 - 开发环境是 worktree 隔离，不影响生产
 - 开发/生产数据库完全隔离
+- 域名 `wxcl.nzyy.ltd` 解析到港服，nginx 转发到乌服 3008
 
 ### 港服配置
 
