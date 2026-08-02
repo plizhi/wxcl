@@ -414,12 +414,29 @@ AI 回复时参考画像 → 更个性化建议
 
 | 项目 | 值 |
 |------|-----|
-| 代码位置 | `/home/pupeng/wxcl-v2/`（乌服） |
+| 代码位置（生产） | `/home/pupeng/wxcl-v2/`（乌服） |
 | 服务端口 | 3006 |
 | basePath | `/v2` |
-| 数据库 | PostgreSQL wxcl（乌服本地） |
+| 数据库（生产） | PostgreSQL wxcl（乌服本地） |
 | 原版地址 | https://wxcl.nzyy.cc/（不动） |
 | V2 地址 | https://wxcl.nzyy.cc/v2 |
+
+### 开发环境
+
+| 项目 | 值 |
+|------|-----|
+| 代码位置（开发） | `/home/pupeng/projects/wxcl-v2-dev/`（worktree） |
+| 分支 | dev-work |
+| 服务端口 | 3008 |
+| 访问 URL | http://wxcl.nzyy.ltd/v2 |
+| 数据库（开发） | PostgreSQL wxcl_dev |
+| 测试账号 | 13800138000 |
+
+**注意：**
+- 生产环境受 systemd 管理，代码更新后 `sudo systemctl restart wxcl-v2.service`
+- 开发环境是 worktree 隔离，不影响生产
+- 开发/生产数据库完全隔离
+- 域名 `wxcl.nzyy.ltd` 解析到港服，nginx 转发到乌服 3008
 
 ### 港服配置
 
@@ -459,6 +476,22 @@ location /v2 {
 **后续建议**：
 - 考虑简化架构：让乌服直接对外 HTTPS
 - 或在港服和乌服之间建立内网专线
+
+### 港服 nginx 配置安全规范
+
+**修改前：**
+- 先备份：`sudo cp /etc/nginx/nginx.conf /etc/nginx/nginx.conf.bak.$(date +%Y%m%d%H%M%S)`
+
+**修改原则：**
+- 只追加新 server 块，不修改现有配置
+- 使用 `nginx -t` 验证语法后再 reload
+- 用 `nginx -s reload` 而非 restart，避免中断连接
+
+**操作步骤：**
+1. 备份现有配置
+2. 追加新 server 块到 nginx.conf
+3. `sudo nginx -t` 验证语法
+4. `sudo nginx -s reload`
 
 ---
 
