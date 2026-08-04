@@ -8,24 +8,24 @@ const dailyCases = [
     title: '折纸飞机', context: '妈妈 · 小明 8岁',
     story: '今天放学，小明一进门就举着一架折纸飞机冲过来："妈妈你看你看！这是我今天手工课学的，花了一整节课才折好！"他小心翼翼地捧着，像是捧着什么宝贝。"你能不能陪我到楼下试飞一下？"\n\n我放下手里的事，跟他下楼。秋天的傍晚，风刚刚好。他用力把飞机抛出去，飞机晃晃悠悠飞了几米，掉下来了。他跑过去捡起来，说"再来！"我们又试了一次、两次，三次。每次飞机飞出去，他就追着跑，笑着、叫着。最后一次，飞机飞得特别远，他追到草地那头才捡到，举着飞机朝我挥手，满脸都是成就感。\n\n他说："妈妈，明天还能再来吗？"',
     strengths: ['他花一整节课折一架飞机，不是在"浪费时间"——他是在练习"我把想法变成现实"的能力', '面对失败说"再来"，这不是固执，是面对挫折时的内在韧性', '他举着飞机朝你挥手时，他在分享的不只是飞机，是他"做到了"的骄傲'],
-    opportunity1: { dimension: '孩子用一整节课认真折纸飞机，并在失败后坚持尝试——这种对事物的热情和好奇心值得被保护', description: '', suggestion: '' },
-    opportunity2: { dimension: '孩子在多次试飞失败后仍说"再来"并在成功后体验到满满的成就感——让他在努力与结果中反复感受这份喜悦', description: '', suggestion: '' },
+    opportunity1: { dimension: '孩子用一整节课认真折纸飞机，并在失败后坚持尝试，他对事物的热情和好奇心值得被保护', description: '成全层次1：永葆热情与好奇心', suggestion: '可以准备更多折纸材料和相关书籍，让孩子自由探索不同纸飞机设计' },
+    opportunity2: { dimension: '孩子在多次试飞失败后仍说"再来"，并在成功后体验到满满的成就感', description: '成全层次5：享受其中', suggestion: '多创造类似"试飞"的完整体验机会，让孩子在努力与结果中反复感受喜悦' },
     advice: '享受孩子此刻的分享与快乐，用陪伴和鼓励延续他的探索热情。',
   },
   {
     title: '不吃青菜', context: '妈妈 · 小明 8岁',
     story: '晚饭时间，小明夹了一筷子青菜放进嘴里嚼了两下，眉头皱起来，把筷子放下了。"妈妈，青菜好难吃。"他小声说，然后就不肯再动那盘青菜了。\n\n我没有说他，也没有逼他吃。只是把话题岔开，聊了聊今天学校里的事。聊着聊着，我注意到他又悄悄拿起了筷子，自己夹了一点青菜放进嘴里，慢慢嚼着咽下去了。\n\n他没有说话，但我知道他是在用自己的方式尝试。',
     strengths: ['他说"青菜好难吃"而不是大哭大闹——这是他在用语言管理自己的体验', '他没有讨价还价，也没有赌气，而是在你的沉默中找到了"我可以自己决定"的空间'],
-    opportunity1: { dimension: '孩子温和地说"青菜好难吃"而不是大哭大闹——他在用语言管理自己的体验', description: '', suggestion: '' },
-    opportunity2: { dimension: '孩子被接纳后悄悄拿起筷子自己尝试——他在用自己的方式面对真实', description: '', suggestion: '' },
+    opportunity1: { dimension: '孩子温和地说"青菜好难吃"而不是大哭大闹，他在用语言管理自己的体验', description: '成全层次5：享受其中', suggestion: '可以给他一个明确的口头许可："不喜欢可以先不吃，妈妈尊重你的选择。"' },
+    opportunity2: { dimension: '孩子被接纳后悄悄拿起筷子自己尝试，他在用自己的方式面对真实', description: '滋养方向：实事求是', suggestion: '当他再次尝试时，可以轻声问一句："这次感觉怎么样？"帮他命名真实体验。' },
     advice: '今天你给了孩子一个安全的"试错空间"，他的悄悄尝试就是在回应你的信任。',
   },
   {
     title: '第一次运动', context: '爸爸 · 小华 14岁',
     story: '这个周末，小华突然从房间里出来，说："爸，我想去打篮球。"我愣了一下——这是他第一次主动提出要运动。以前周末他都是宅在房间里玩手机，怎么叫都不出来。\n\n我问他要不要我陪他去，他说不用，自己换好衣服就出门了。我透过窗户看着他骑上自行车的背影，心里有点意外，也有点欣慰。\n\n两个小时后他回来了，满头大汗，但脸上带着一种我从没见过的表情——像是完成了什么。他把篮球往地上一放，说："爸，下次我还要去。"',
     strengths: ['孩子主动提出去运动，展现了内在的自主性，他能够基于内在动机做出新的选择', '独自前往并完成任务，体现了自我负责的态度'],
-    opportunity1: { dimension: '孩子宅家已久却主动提出要出门打篮球——这对新体验的热情和对世界的好奇心值得被保护', description: '', suggestion: '' },
-    opportunity2: { dimension: '孩子独自前往并在运动中体验到"我能做到"的成就感——这种内心的力量感值得被延续', description: '', suggestion: '' },
+    opportunity1: { dimension: '孩子宅家已久却主动提出要出门打篮球，他对新体验的热情和对世界的好奇心值得被保护', description: '成全层次1：永葆热情与好奇心', suggestion: '下次可以试试和他聊聊打篮球时的感受，让他的兴趣有更多延伸的空间。' },
+    opportunity2: { dimension: '孩子独自前往并在运动中体验到"我能做到"的成就感，这种内心的力量感值得被延续', description: '成全层次3：面对困难与挑战时能唤醒的内在勇气与力量', suggestion: '在他表达"下次还要去"时，简单回应一句"好啊，我很高兴你喜欢"，然后让他主导安排。' },
     advice: '你的沉默比追问更有力量，就让这个小火苗自己燃烧吧。',
   }
 ];
@@ -81,24 +81,16 @@ function DailyCard({ data }: { data: typeof dailyCases[0] }) {
           )}
           {data.opportunity1 && (
             <div className="bg-amber-50 rounded-lg p-3">
-              <div className="text-xs text-amber-600 mb-1">🌱 {data.opportunity1.dimension}</div>
-              {data.opportunity1.description && (
-                <div className="text-xs text-gray-700">{data.opportunity1.description}</div>
-              )}
-              {data.opportunity1.suggestion && (
-                <div className="text-xs text-gray-600 mt-1">→ {data.opportunity1.suggestion}</div>
-              )}
+              <div className="text-xs text-amber-600 font-medium mb-1">🌱 {data.opportunity1.dimension}</div>
+              <div className="text-xs text-gray-700">{data.opportunity1.description}</div>
+              <div className="text-xs text-gray-600 mt-1">→ {data.opportunity1.suggestion}</div>
             </div>
           )}
           {data.opportunity2 && (
             <div className="bg-amber-50 rounded-lg p-3">
-              <div className="text-xs text-amber-600 mb-1">🌱 {data.opportunity2.dimension}</div>
-              {data.opportunity2.description && (
-                <div className="text-xs text-gray-700">{data.opportunity2.description}</div>
-              )}
-              {data.opportunity2.suggestion && (
-                <div className="text-xs text-gray-600 mt-1">→ {data.opportunity2.suggestion}</div>
-              )}
+              <div className="text-xs text-amber-600 font-medium mb-1">🌱 {data.opportunity2.dimension}</div>
+              <div className="text-xs text-gray-700">{data.opportunity2.description}</div>
+              <div className="text-xs text-gray-600 mt-1">→ {data.opportunity2.suggestion}</div>
             </div>
           )}
           {data.advice && (
