@@ -15,7 +15,7 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (!isLoading && isLoggedIn) {
-      router.replace('/');
+      router.replace('/tab');
     }
   }, [isLoggedIn, isLoading, router]);
 
@@ -30,7 +30,7 @@ export default function LoginPage() {
       // 支持密码登录（老用户）和激活码登录
       await login(phone, undefined, password || undefined);
       toast('登录成功', 'success');
-      router.replace('/');
+      router.replace('/tab');
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : String(error);
       if (msg.includes('激活码') || msg.includes('验证码')) {
