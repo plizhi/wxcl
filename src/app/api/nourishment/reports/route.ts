@@ -129,11 +129,28 @@ export async function POST(req: NextRequest) {
         : '还没有记录滋养时刻，去发现那些被孩子滋养的小确幸吧。',
     };
 
-    const result = await queryOne(
-      `INSERT INTO nourishment_reports (child_id, period_type, period_start, period_end, content, moment_count)
-       VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-      [childId, periodType, periodStart, periodEnd, JSON.stringify(reportContent), moments.length]
+    // 检查是否已存在该 childId + periodType 的报告
+    const existing = await query(
+      `SELECT id FROM nourishment_reports WHERE child_id = $1 AND period_type = $2`,
+      [childId, periodType]
     );
+
+    let result;
+    if (existing.length > 0) {
+      // 更新已有报告
+      result = await queryOne(
+        `UPDATE nourishment_reports SET period_start = $3, period_end = $4, content = $5, moment_count = $6, created_at = NOW()
+         WHERE id = $1 RETURNING *`,
+        [existing[0].id, childId, periodStart, periodEnd, JSON.stringify(reportContent), moments.length]
+      );
+    } else {
+      // 新建报告
+      result = await queryOne(
+        `INSERT INTO nourishment_reports (child_id, period_type, period_start, period_end, content, moment_count)
+         VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+        [childId, periodType, periodStart, periodEnd, JSON.stringify(reportContent), moments.length]
+      );
+    }
 
     return NextResponse.json({ report: transformReport(result) });
   } catch (err) {

@@ -78,7 +78,7 @@ export default function AddChildPage() {
     } catch (e) {
       console.error('创建默认孩子档案失败', e);
     }
-    router.replace('/');
+    router.replace('/home');
   }
 
   return (

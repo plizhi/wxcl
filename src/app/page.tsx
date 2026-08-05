@@ -1,7 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { useAuth } from '@/context/AuthContext';
 
 const dailyCases = [
   {
@@ -149,6 +151,23 @@ function VentingCard({ data }: { data: typeof ventingCases[0] }) {
 }
 
 export default function LandingPage() {
+  const router = useRouter();
+  const { isLoggedIn, isLoading } = useAuth();
+
+  useEffect(() => {
+    if (!isLoading && isLoggedIn) {
+      router.replace('/home');
+    }
+  }, [isLoggedIn, isLoading, router]);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-gray-400">加载中...</div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-[#fffbf7]">
       {/* Hero Section */}
@@ -159,7 +178,7 @@ export default function LandingPage() {
         <div className="relative z-10 text-center">
           <div className="mb-8">
             <div className="w-full max-w-2xl h-48 md:h-64 mx-auto rounded-2xl shadow-xl bg-cover bg-center"
-              style={{ backgroundImage: 'url(/v2/media/apricot-forest-full.png)' }} />
+              style={{ backgroundImage: 'url(/media/apricot-forest-full.png)' }} />
           </div>
           <h1 className="text-3xl md:text-5xl font-bold text-stone-800 mb-6 tracking-tight leading-tight">
             让我们一起在时光里，<br /><span className="text-amber-600">望杏成林</span>

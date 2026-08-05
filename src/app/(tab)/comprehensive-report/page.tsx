@@ -606,7 +606,7 @@ export default function ComprehensiveReportPage() {
 
           {/* 返回按钮 */}
           <button
-            onClick={() => router.push('/')}
+            onClick={() => router.push('/home')}
             className="w-full py-2.5 rounded-full text-white text-sm font-medium"
             style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}
           >

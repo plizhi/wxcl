@@ -15,7 +15,7 @@ export default function DailyCarePage() {
   const [loading, setLoading] = useState(false);
   const [report, setReport] = useState<any>(null);
   const [records, setRecords] = useState<any[]>([]);
-  const [showHistory, setShowHistory] = useState(false);
+  const [selectedRecord, setSelectedRecord] = useState<any>(null);
   const [showNourishGuide, setShowNourishGuide] = useState(false);
   const [extracting, setExtracting] = useState(false);
   const [extractions, setExtractions] = useState<any[]>([]);
@@ -29,7 +29,7 @@ export default function DailyCarePage() {
 
   async function loadRecords() {
     try {
-      const res = await fetch('/v2/api/daily-care/records', {
+      const res = await fetch('/api/daily-care/records', {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token') || ''}`,
         },
@@ -46,7 +46,7 @@ export default function DailyCarePage() {
   async function checkNourishmentMoments() {
     if (!currentChildId) return;
     try {
-      const res = await fetch(`/v2/api/nourishment?childId=${currentChildId}&limit=1`, {
+      const res = await fetch(`/api/nourishment?childId=${currentChildId}&limit=1`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token') || ''}`,
         },
@@ -64,7 +64,7 @@ export default function DailyCarePage() {
   async function handleExtractNourishment() {
     setExtracting(true);
     try {
-      const res = await fetch('/v2/api/nourishment/extract', {
+      const res = await fetch('/api/nourishment/extract', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -92,7 +92,7 @@ export default function DailyCarePage() {
     if (!reflectionContent.trim()) return;
     setSavingReflection(true);
     try {
-      const res = await fetch('/v2/api/profiles/reflections', {
+      const res = await fetch('/api/profiles/reflections', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -127,7 +127,7 @@ export default function DailyCarePage() {
     setLoading(true);
     setReport(null);
     try {
-      const res = await fetch('/v2/api/daily-care/analyze', {
+      const res = await fetch('/api/daily-care/analyze', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -157,15 +157,16 @@ export default function DailyCarePage() {
 
   async function loadReport(id: number) {
     try {
-      const res = await fetch(`/v2/api/daily-care/report/${id}`, {
+      const res = await fetch(`/api/daily-care/report/${id}`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token') || ''}`,
         },
       });
       const data = await res.json();
       if (data.report) {
+        const record = records.find(r => r.id === id);
+        setSelectedRecord(record);
         setReport(data.report);
-        setShowHistory(false);
       }
     } catch (e) {
       console.error('加载报告失败', e);
@@ -181,17 +182,58 @@ export default function DailyCarePage() {
             ← 返回
           </button>
           <h1 className="text-lg font-medium">🌿 陪伴&观察</h1>
-          <button
-            onClick={() => setShowHistory(!showHistory)}
-            className="ml-auto text-sm text-amber-600"
-          >
-            {showHistory ? '收起' : '历史'}
-          </button>
         </div>
       </div>
 
-      {/* 历史记录 */}
-      {showHistory && (
+      {/* 输入区域 */}
+      <div className="mx-4 mt-4">
+        <div className="bg-white rounded-xl p-4 shadow-sm">
+          <p className="text-sm text-gray-500 mb-2">今天和孩子发生了什么？</p>
+          <textarea
+            value={content}
+            onChange={(e) => setContent(e.target.value)}
+            placeholder="不需要完整，只要真实..."
+            maxLength={1000}
+            className="w-full p-3 rounded-lg border border-gray-200 focus:border-amber-400 focus:ring-0 outline-none resize-none min-h-32"
+          />
+          <div className="flex justify-between items-center mt-2">
+            <span className="text-xs text-gray-400">{content.length}/1000</span>
+            <button
+              onClick={handleSubmit}
+              disabled={loading || !content.trim()}
+              className="px-6 py-2 bg-amber-500 text-white rounded-full text-sm font-medium disabled:opacity-50"
+            >
+              {loading ? '分析中...' : '记录今日'}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* 历史记录 / 选中记录详情 */}
+      {selectedRecord ? (
+        /* 选中记录详情 */
+        <div className="bg-white mx-4 mt-4 rounded-xl p-4 shadow-sm">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="font-medium text-gray-800">记录详情</h3>
+            <button
+              onClick={() => setSelectedRecord(null)}
+              className="text-sm text-amber-600"
+            >
+              返回列表
+            </button>
+          </div>
+          {/* 原始记录内容 */}
+          <div className="bg-gray-50 rounded-lg p-3 mb-4">
+            <p className="text-sm text-gray-600 whitespace-pre-wrap">{selectedRecord.content}</p>
+            <p className="text-xs text-gray-400 mt-2">
+              {new Date(selectedRecord.createdAt).toLocaleDateString('zh-CN', {
+                year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit'
+              })}
+            </p>
+          </div>
+        </div>
+      ) : (
+        /* 历史记录列表 */
         <div className="bg-white mx-4 mt-4 rounded-xl p-4 shadow-sm">
           <h3 className="font-medium text-gray-800 mb-3">最近记录</h3>
           {records.length === 0 ? (
@@ -280,30 +322,6 @@ export default function DailyCarePage() {
           )}
         </div>
       )}
-
-      {/* 输入区域 */}
-      <div className="mx-4 mt-4">
-        <div className="bg-white rounded-xl p-4 shadow-sm">
-          <p className="text-sm text-gray-500 mb-2">今天和孩子发生了什么？</p>
-          <textarea
-            value={content}
-            onChange={(e) => setContent(e.target.value)}
-            placeholder="不需要完整，只要真实..."
-            maxLength={1000}
-            className="w-full p-3 rounded-lg border border-gray-200 focus:border-amber-400 focus:ring-0 outline-none resize-none min-h-32"
-          />
-          <div className="flex justify-between items-center mt-2">
-            <span className="text-xs text-gray-400">{content.length}/1000</span>
-            <button
-              onClick={handleSubmit}
-              disabled={loading || !content.trim()}
-              className="px-6 py-2 bg-amber-500 text-white rounded-full text-sm font-medium disabled:opacity-50"
-            >
-              {loading ? '分析中...' : '记录今日'}
-            </button>
-          </div>
-        </div>
-      </div>
 
       {/* 家长反思入口 */}
       <div className="mx-4 mt-4">
