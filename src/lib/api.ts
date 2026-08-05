@@ -21,11 +21,7 @@ async function request<T>(
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  // V2 API 使用 /v2 前缀
-  const basePath = '/v2';
-  const fullPath = path.startsWith('/v2') ? path : `${basePath}${path}`;
-
-  const response = await fetch(fullPath, {
+  const response = await fetch(path, {
     ...options,
     headers,
   });
@@ -39,7 +35,7 @@ async function request<T>(
       localStorage.removeItem('userId');
       // 如果不是登录页，才跳转到登录页
       if (!window.location.pathname.includes('/login') && !window.location.pathname.includes('/register')) {
-        window.location.href = '/v2/login';
+        window.location.href = '/login';
       }
     }
     throw new Error(data.message || '请求失败');

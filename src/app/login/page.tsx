@@ -15,7 +15,7 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (!isLoading && isLoggedIn) {
-      router.replace('/');
+      router.replace('/home');
     }
   }, [isLoggedIn, isLoading, router]);
 
@@ -30,7 +30,7 @@ export default function LoginPage() {
       // 支持密码登录（老用户）和激活码登录
       await login(phone, undefined, password || undefined);
       toast('登录成功', 'success');
-      router.replace('/');
+      router.replace('/home');
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : String(error);
       if (msg.includes('激活码') || msg.includes('验证码')) {
@@ -51,7 +51,7 @@ export default function LoginPage() {
       <div className="text-center pt-16 pb-8">
         <div
           className="h-40 mx-4 rounded-2xl bg-cover bg-center bg-no-repeat mb-4"
-          style={{ backgroundImage: 'url(/v2/media/apricot-forest-full.png)' }}
+          style={{ backgroundImage: 'url(/media/apricot-forest-full.png)' }}
         />
         <p className="text-lg text-purple-700 mb-1">让我们一起在时光里</p>
         <h1 className="text-3xl font-bold text-purple-900">望杏成林</h1>
@@ -101,16 +101,6 @@ export default function LoginPage() {
             没有账号？<a href="/register" className="text-purple-500 font-medium">立即注册 →</a>
           </p>
         </div>
-      </div>
-
-      {/* 切换到原版 */}
-      <div className="text-center pb-8">
-        <a
-          href="https://wxcl.nzyy.cc/"
-          className="text-sm text-gray-400 hover:text-gray-600"
-        >
-          体验原版 →
-        </a>
       </div>
     </div>
   );

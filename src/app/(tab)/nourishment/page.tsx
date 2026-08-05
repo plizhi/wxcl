@@ -27,6 +27,7 @@ export default function NourishmentPage() {
   const [showReports, setShowReports] = useState(false);
   const [reports, setReports] = useState<NourishmentReport[]>([]);
   const [generating, setGenerating] = useState<string | null>(null);
+  const [expandedReport, setExpandedReport] = useState<string | null>(null);
   const [fact, setFact] = useState('');
   const [feeling, setFeeling] = useState('');
   const [saving, setSaving] = useState(false);
@@ -129,7 +130,7 @@ export default function NourishmentPage() {
           onClick={async () => {
             if (!currentChildId) return;
             try {
-              const res = await fetch('/v2/api/nourishment/extract', {
+              const res = await fetch('/api/nourishment/extract', {
                 method: 'POST',
                 headers: {
                   'Content-Type': 'application/json',
@@ -247,8 +248,47 @@ export default function NourishmentPage() {
                 <p className="text-xs text-gray-500 mb-2">历史报告</p>
                 {reports.slice(0, 5).map(report => (
                   <div key={report.id} className="py-2 border-b border-gray-50 last:border-0">
-                    <p className="text-sm font-medium text-gray-700">{report.content?.periodSummary}</p>
-                    <p className="text-xs text-gray-400">{report.momentCount} 个滋养时刻</p>
+                    <button
+                      onClick={() => setExpandedReport(expandedReport === report.id ? null : report.id || null)}
+                      className="w-full text-left"
+                    >
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <p className="text-sm font-medium text-gray-700">{report.content?.periodSummary}</p>
+                          <p className="text-xs text-gray-400">{report.momentCount} 个滋养时刻</p>
+                        </div>
+                        <span className="text-gray-400 ml-2">{expandedReport === report.id ? '∧' : '∨'}</span>
+                      </div>
+                    </button>
+                    {expandedReport === report.id && report.content && (
+                      <div className="mt-3 p-3 bg-purple-50 rounded-xl text-sm">
+                        {report.content.feelings && report.content.feelings.length > 0 && (
+                          <div className="mb-2">
+                            <p className="text-xs text-purple-600 font-medium">感受回顾</p>
+                            <p className="text-gray-600">{report.content.feelings.join('、')}</p>
+                          </div>
+                        )}
+                        {report.content.facts && report.content.facts.length > 0 && (
+                          <div className="mb-2">
+                            <p className="text-xs text-purple-600 font-medium">温暖时刻</p>
+                            <ul className="text-gray-600 text-xs space-y-1">
+                              {report.content.facts.slice(0, 3).map((f, i) => (
+                                <li key={i}>• {f}</li>
+                              ))}
+                              {report.content.facts.length > 3 && (
+                                <li className="text-gray-400">...还有 {report.content.facts.length - 3} 条</li>
+                              )}
+                            </ul>
+                          </div>
+                        )}
+                        {report.content.reflection && (
+                          <div>
+                            <p className="text-xs text-purple-600 font-medium">反思</p>
+                            <p className="text-gray-600 text-xs italic">{report.content.reflection}</p>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>

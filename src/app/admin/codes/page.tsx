@@ -41,7 +41,7 @@ export default function AdminCodesPage() {
   async function fetchCodes() {
     setLoading(true);
     try {
-      const resp = await fetch('/v2/api/auth/codes', {
+      const resp = await fetch('/api/auth/codes', {
         headers: getHeaders()
       });
       const data = await resp.json();
@@ -61,7 +61,7 @@ export default function AdminCodesPage() {
   async function generateCodes() {
     setLoading(true);
     try {
-      const resp = await fetch('/v2/api/auth/codes', {
+      const resp = await fetch('/api/auth/codes', {
         method: 'POST',
         headers: getHeaders(),
         body: JSON.stringify({ phone: phone || undefined, count: parseInt(count as any) || 1 })

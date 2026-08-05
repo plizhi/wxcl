@@ -96,7 +96,7 @@ export default function OnboardingPage() {
 
   function handleSkip() {
     localStorage.setItem('onboarding_done', 'true');
-    router.replace('/');
+    router.replace('/home');
   }
 
   async function handleSubmit() {
@@ -131,7 +131,7 @@ export default function OnboardingPage() {
 
   function handleDone() {
     localStorage.setItem('onboarding_done', 'true');
-    router.replace('/');
+    router.replace('/home');
   }
 
   const filledCount = records.filter(r => r.content.trim().length > 0).length;

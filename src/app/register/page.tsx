@@ -78,7 +78,7 @@ export default function RegisterPage() {
       <div className="relative mb-6 rounded-b-2xl overflow-hidden">
         <div
           className="h-48 bg-cover bg-center bg-no-repeat"
-          style={{ backgroundImage: 'url(/v2/media/apricot-forest-full.png)' }}
+          style={{ backgroundImage: 'url(/media/apricot-forest-full.png)' }}
         />
         <div className="absolute inset-0 bg-gradient-to-br from-purple-900/60 to-amber-600/30" />
         <div className="absolute inset-0 flex flex-col justify-center items-center text-white">

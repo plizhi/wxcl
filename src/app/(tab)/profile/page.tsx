@@ -234,7 +234,7 @@ export default function ProfilePage() {
 
       {/* 服务条款 */}
       <div className="mx-4 mt-4 bg-white rounded-2xl shadow-sm overflow-hidden">
-        <button className="w-full flex items-center justify-between px-5 py-4">
+        <button onClick={() => router.push('/terms')} className="w-full flex items-center justify-between px-5 py-4">
           <span className="text-gray-700">服务条款</span>
           <span className="text-gray-400">→</span>
         </button>
