@@ -187,7 +187,7 @@ export default function RegisterPage() {
             </button>
 
             <p className="text-center text-sm text-gray-400 mt-4">
-              已有账号？<a href="/v2/login" className="text-purple-600">直接登录</a>
+              已有账号？<a href="/login" className="text-purple-600">直接登录</a>
             </p>
           </div>
         </div>
