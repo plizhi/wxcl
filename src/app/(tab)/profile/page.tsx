@@ -232,6 +232,23 @@ export default function ProfilePage() {
         </button>
       </div>
 
+      {/* 设置密码入口 */}
+      <div className="mx-4 mt-4 bg-white rounded-2xl shadow-sm overflow-hidden">
+        <button
+          onClick={() => router.push('/profile/password')}
+          className="w-full flex items-center justify-between px-5 py-4"
+        >
+          <div className="flex items-center gap-3">
+            <span className="text-xl">🔑</span>
+            <div className="text-left">
+              <p className="text-gray-700">设置密码</p>
+              <p className="text-xs text-gray-400">设置后可用密码登录</p>
+            </div>
+          </div>
+          <span className="text-gray-400">→</span>
+        </button>
+      </div>
+
       {/* 服务条款 */}
       <div className="mx-4 mt-4 bg-white rounded-2xl shadow-sm overflow-hidden">
         <button onClick={() => router.push('/terms')} className="w-full flex items-center justify-between px-5 py-4">

@@ -52,10 +52,32 @@ export default function TermsPage() {
           </p>
         </section>
 
-        <p className="text-xs text-stone-400 mt-12">
+        <p className="text-xs text-stone-400 mt-12 pb-20">
           最后更新日期：2026年8月
         </p>
       </main>
+
+      {/* 底部导航栏 */}
+      <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 z-50">
+        <div className="flex justify-around items-center h-14">
+          <a href="/home" className="flex flex-col items-center justify-center w-16 h-full gap-0.5 text-gray-400">
+            <span className="text-xl">🏠</span>
+            <span className="text-xs">首页</span>
+          </a>
+          <a href="/daily-care" className="flex flex-col items-center justify-center w-16 h-full gap-0.5 text-gray-400">
+            <span className="text-xl">🌿</span>
+            <span className="text-xs">陪伴&观察</span>
+          </a>
+          <a href="/questions" className="flex flex-col items-center justify-center w-16 h-full gap-0.5 text-gray-400">
+            <span className="text-xl">💬</span>
+            <span className="text-xs">压力吐槽</span>
+          </a>
+          <a href="/profile" className="flex flex-col items-center justify-center w-16 h-full gap-0.5 text-purple-600">
+            <span className="text-xl">👤</span>
+            <span className="text-xs">我的</span>
+          </a>
+        </div>
+      </nav>
     </div>
   );
 }

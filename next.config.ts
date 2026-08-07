@@ -6,6 +6,7 @@ const nextConfig: NextConfig = {
   },
   basePath: '',
   assetPrefix: '',
+  allowedDevOrigins: ['wxcl.nzyy.ltd', 'nzyy.ltd'],
 };
 
 export default nextConfig;

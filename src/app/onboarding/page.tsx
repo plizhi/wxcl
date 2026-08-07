@@ -99,8 +99,44 @@ export default function OnboardingPage() {
     router.replace('/home');
   }
 
+  // 添加当前输入到记录列表
+  function addCurrentToRecords() {
+    const currentContent = records[currentIndex]?.content?.trim() || '';
+    if (!currentContent) {
+      toast('请先输入内容', 'error');
+      return false;
+    }
+
+    // 更新当前记录内容（确保标记为已填充）
+    const updatedRecords = records.map((r, idx) =>
+      idx === currentIndex ? { ...r, content: currentContent } : r
+    );
+    setRecords(updatedRecords);
+
+    // 重置当前输入框为空，添加一个新的空记录
+    const newId = records.length > 0 ? Math.max(...records.map(r => r.id)) + 1 : 1;
+    const newRecords = [
+      ...updatedRecords.filter(r => r.content.trim()), // 保留所有已填充的
+      { id: newId, content: '' } // 添加新的空记录
+    ];
+    setRecords(newRecords);
+    setCurrentIndex(newRecords.length - 1); // 指向新记录
+
+    return true;
+  }
+
   async function handleSubmit() {
-    const validRecords = records.filter(r => r.content.trim().length > 0);
+    // 先把当前输入添加到记录
+    const currentContent = records[currentIndex]?.content?.trim() || '';
+    let allRecords = records;
+    if (currentContent) {
+      const updatedRecords = records.map((r, idx) =>
+        idx === currentIndex ? { ...r, content: currentContent } : r
+      );
+      allRecords = updatedRecords;
+    }
+
+    const validRecords = allRecords.filter(r => r.content.trim().length > 0);
     if (validRecords.length === 0) {
       toast('请至少填写一条记录', 'error');
       return;
@@ -175,15 +211,15 @@ export default function OnboardingPage() {
             {(initialReport.opportunity_axis1 || initialReport.opportunity_axis2) && (
               <div className="bg-purple-50 rounded-2xl p-5">
                 <h3 className="text-sm font-medium text-purple-600 mb-2">🌱 机会窗口</h3>
-                {initialReport.opportunity_axis1 && (
+                {initialReport.opportunity_axis1 && initialReport.opportunity_axis1.dimension && (
                   <div className="text-xs text-gray-700 mb-1">
                     <span className="font-medium">{initialReport.opportunity_axis1.dimension}：</span>
                     {initialReport.opportunity_axis1.description}
                   </div>
                 )}
-                {initialReport.opportunity_axis2 && (
+                {initialReport.opportunity_axis2 && initialReport.opportunity_axis2.dimension && (
                   <div className="text-xs text-gray-700">
-                    <span className="font-medium">{initialReport.opportunity_axis2.element}：</span>
+                    <span className="font-medium">{initialReport.opportunity_axis2.dimension}：</span>
                     {initialReport.opportunity_axis2.description}
                   </div>
                 )}
@@ -200,7 +236,7 @@ export default function OnboardingPage() {
         </div>
 
         {/* 底部按钮 */}
-        <div className="px-4 py-4 bg-white shadow-lg">
+        <div className="px-4 py-4 pb-20 bg-white shadow-lg">
           <button
             onClick={handleDone}
             className="w-full py-3 rounded-2xl text-white font-medium text-base"
@@ -209,6 +245,28 @@ export default function OnboardingPage() {
             开始记录 →
           </button>
         </div>
+
+        {/* 底部导航栏 */}
+        <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 z-50">
+          <div className="flex justify-around items-center h-14">
+            <a href="/home" className="flex flex-col items-center justify-center w-16 h-full gap-0.5 text-gray-400">
+              <span className="text-xl">🏠</span>
+              <span className="text-xs">首页</span>
+            </a>
+            <a href="/daily-care" className="flex flex-col items-center justify-center w-16 h-full gap-0.5 text-gray-400">
+              <span className="text-xl">🌿</span>
+              <span className="text-xs">陪伴&观察</span>
+            </a>
+            <a href="/questions" className="flex flex-col items-center justify-center w-16 h-full gap-0.5 text-gray-400">
+              <span className="text-xl">💬</span>
+              <span className="text-xs">压力吐槽</span>
+            </a>
+            <a href="/profile" className="flex flex-col items-center justify-center w-16 h-full gap-0.5 text-gray-400">
+              <span className="text-xl">👤</span>
+              <span className="text-xs">我的</span>
+            </a>
+          </div>
+        </nav>
       </div>
     );
   }
@@ -254,7 +312,7 @@ export default function OnboardingPage() {
         {/* 单条输入框 */}
         <div className="bg-white rounded-2xl p-4 shadow-sm mb-4">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-medium text-gray-600">第 {currentIndex + 1} 条</span>
+            <span className="text-sm font-medium text-gray-600">第 {filledCount + 1} 条</span>
             {records[currentIndex]?.content && (
               <button
                 onClick={() => deleteRecord(records[currentIndex].id)}
@@ -283,15 +341,26 @@ export default function OnboardingPage() {
               <span className="text-xs text-amber-500">快写满了</span>
             )}
           </div>
+
+          {/* 添加按钮 */}
+          <button
+            onClick={addCurrentToRecords}
+            disabled={!records[currentIndex]?.content?.trim()}
+            className="w-full mt-3 py-2 border-2 border-amber-300 rounded-xl text-sm text-amber-600 hover:bg-amber-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            添加到列表
+          </button>
         </div>
 
         {/* 已填写的记录预览 */}
-        {records.filter(r => r.content.trim().length > 0).length > 1 && (
+        {records.filter(r => r.content.trim().length > 0).length > 0 && (
           <div className="mb-4">
             <p className="text-xs text-gray-400 mb-2">已添加的记录：</p>
             <div className="space-y-2">
               {records.map((r, idx) => {
                 if (!r.content.trim()) return null;
+                // 计算在已填充记录中的序号
+                const seqNum = records.slice(0, idx + 1).filter(x => x.content.trim()).length;
                 return (
                   <div
                     key={r.id}
@@ -304,7 +373,7 @@ export default function OnboardingPage() {
                   >
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
-                        <span className="text-xs text-amber-500 mr-2">#{idx + 1}</span>
+                        <span className="text-xs text-amber-500 mr-2">#{seqNum}</span>
                         <span className="text-xs text-gray-400">{r.content.length}字</span>
                       </div>
                       <button
@@ -337,7 +406,7 @@ export default function OnboardingPage() {
       </div>
 
       {/* 底部操作区 */}
-      <div className="bg-white px-4 py-4 shadow-lg">
+      <div className="bg-white px-4 pt-4 pb-20 shadow-lg">
         <button
           onClick={handleSkip}
           className="w-full py-2 text-sm text-gray-400 hover:text-gray-600 mb-2"
@@ -353,10 +422,32 @@ export default function OnboardingPage() {
           {submitting ? (
             <span>🌿 望杏分析中...</span>
           ) : (
-            <span>生成初始画像 {filledCount > 0 && `(${filledCount}条)`}</span>
+            <span>生成初始画像 {filledCount > 0 ? `(${filledCount}条)` : ''}</span>
           )}
         </button>
       </div>
+
+      {/* 底部导航栏 */}
+      <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 z-50">
+        <div className="flex justify-around items-center h-14">
+          <a href="/home" className="flex flex-col items-center justify-center w-16 h-full gap-0.5 text-gray-400">
+            <span className="text-xl">🏠</span>
+            <span className="text-xs">首页</span>
+          </a>
+          <a href="/daily-care" className="flex flex-col items-center justify-center w-16 h-full gap-0.5 text-gray-400">
+            <span className="text-xl">🌿</span>
+            <span className="text-xs">陪伴&观察</span>
+          </a>
+          <a href="/questions" className="flex flex-col items-center justify-center w-16 h-full gap-0.5 text-gray-400">
+            <span className="text-xl">💬</span>
+            <span className="text-xs">压力吐槽</span>
+          </a>
+          <a href="/profile" className="flex flex-col items-center justify-center w-16 h-full gap-0.5 text-gray-400">
+            <span className="text-xl">👤</span>
+            <span className="text-xs">我的</span>
+          </a>
+        </div>
+      </nav>
     </div>
   );
 }

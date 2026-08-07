@@ -9,7 +9,7 @@ interface Toast {
 }
 
 interface ToastContextType {
-  toast: (message: string, type?: Toast['type']) => void;
+  toast: (message: string, type?: Toast['type'], duration?: number) => void;
 }
 
 const ToastContext = createContext<ToastContextType>({ toast: () => {} });
@@ -17,12 +17,12 @@ const ToastContext = createContext<ToastContextType>({ toast: () => {} });
 export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
 
-  const toast = useCallback((message: string, type: Toast['type'] = 'info') => {
+  const toast = useCallback((message: string, type: Toast['type'] = 'info', duration: number = 2000) => {
     const id = Date.now();
     setToasts(prev => [...prev, { id, message, type }]);
     setTimeout(() => {
       setToasts(prev => prev.filter(t => t.id !== id));
-    }, 2000);
+    }, duration);
   }, []);
 
   return (

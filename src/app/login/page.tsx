@@ -12,6 +12,9 @@ export default function LoginPage() {
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showForgotModal, setShowForgotModal] = useState(false);
+  const [forgotCode, setForgotCode] = useState('');
+  const [forgotLoading, setForgotLoading] = useState(false);
 
   useEffect(() => {
     if (!isLoading && isLoggedIn) {
@@ -27,7 +30,6 @@ export default function LoginPage() {
 
     setLoading(true);
     try {
-      // 支持密码登录（老用户）和激活码登录
       await login(phone, undefined, password || undefined);
       toast('登录成功', 'success');
       router.replace('/home');
@@ -45,8 +47,67 @@ export default function LoginPage() {
     }
   }
 
+  async function handleForgotLogin() {
+    if (!phone || phone.length !== 11) {
+      toast('请输入正确的手机号', 'error');
+      return;
+    }
+    if (!forgotCode) {
+      toast('请输入激活码', 'error');
+      return;
+    }
+
+    setForgotLoading(true);
+    try {
+      await login(phone, forgotCode, undefined);
+      toast('登录成功', 'success');
+      router.replace('/home');
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      toast(msg || '激活码无效', 'error');
+    } finally {
+      setForgotLoading(false);
+    }
+  }
+
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-br from-amber-50 to-purple-50">
+      {/* 忘记密码弹窗 */}
+      {showForgotModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-sm">
+            <h3 className="text-lg font-bold text-gray-800 mb-2">使用激活码登录</h3>
+            <p className="text-sm text-gray-500 mb-4">请输入注册时使用的激活码</p>
+            <div className="space-y-4">
+              <input
+                type="text"
+                placeholder="激活码"
+                maxLength={8}
+                value={forgotCode}
+                onChange={e => setForgotCode(e.target.value.toUpperCase())}
+                className="w-full px-4 py-3 border border-gray-200 rounded-lg text-center focus:outline-none focus:border-purple-500"
+              />
+              <button
+                onClick={handleForgotLogin}
+                disabled={forgotLoading}
+                className="w-full py-3 bg-purple-500 text-white rounded-full font-medium disabled:opacity-50"
+              >
+                {forgotLoading ? '登录中...' : '登录'}
+              </button>
+              <button
+                onClick={() => {
+                  setShowForgotModal(false);
+                  setForgotCode('');
+                }}
+                className="w-full py-2 text-gray-400 text-sm"
+              >
+                取消
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 移动端品牌标识 */}
       <div className="text-center pt-16 pb-8">
         <div
@@ -77,8 +138,8 @@ export default function LoginPage() {
 
             <div>
               <input
-                type="text"
-                placeholder="请输入密码或激活码"
+                type="password"
+                placeholder="请输入密码"
                 maxLength={20}
                 className="w-full px-4 py-4 border border-gray-200 rounded-lg text-base text-center focus:outline-none focus:border-purple-500"
                 value={password}
@@ -94,6 +155,13 @@ export default function LoginPage() {
               style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}
             >
               {loading ? '登录中...' : '登录'}
+            </button>
+
+            <button
+              onClick={() => setShowForgotModal(true)}
+              className="w-full py-2 text-center text-sm text-gray-400 hover:text-gray-600"
+            >
+              忘记密码？使用激活码登录
             </button>
           </div>
 
