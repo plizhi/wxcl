@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query } from "@/lib/db";
 import { getAuthFromRequest } from "@/lib/auth-utils";
+import { logger } from "@/lib/logger";
 
 async function getUserFirstChildId(userId: string): Promise<string | null> {
   const child = await query<{ id: string }>(
@@ -51,7 +52,7 @@ export async function GET(req: NextRequest) {
       [childId, limit, offset]
     );
 
-    return NextResponse.json({
+    return NextResponse.json({ code: 0, message: "成功", data: {
       versions: versions.map(v => ({
         id: v.id,
         childId: v.child_id,
@@ -63,9 +64,9 @@ export async function GET(req: NextRequest) {
         reviewFlags: v.review_flags,
         createdAt: v.created_at,
       }))
-    });
+    }});
   } catch (err) {
-    console.error("DB error:", err);
-    return NextResponse.json({ error: "Database error" }, { status: 500 });
+    logger.error("DB error:", { error: String(err) });
+    return NextResponse.json({ code: 500, message: "服务器错误" }, { status: 500 });
   }
 }

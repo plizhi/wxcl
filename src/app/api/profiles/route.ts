@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query, queryOne } from "@/lib/db";
 import { getAuthFromRequest } from "@/lib/auth-utils";
+import { logger } from "@/lib/logger";
 
 // 辅助函数：从用户的孩子列表中获取第一个孩子
 async function getUserFirstChildId(userId: string): Promise<string | null> {
@@ -53,10 +54,10 @@ export async function GET(req: NextRequest) {
     );
 
     if (!profile) {
-      return NextResponse.json({ profile: null });
+      return NextResponse.json({ code: 0, message: "成功", data: { profile: null } });
     }
 
-    return NextResponse.json({
+    return NextResponse.json({ code: 0, message: "成功", data: {
       profile: {
         id: profile.id,
         childId: profile.child_id,
@@ -70,10 +71,10 @@ export async function GET(req: NextRequest) {
         parentWeight: profile.parent_weight,
         updatedAt: profile.updated_at,
       }
-    });
+    }});
   } catch (err) {
-    console.error("DB error:", err);
-    return NextResponse.json({ error: "Database error" }, { status: 500 });
+    logger.error("DB error:", { error: String(err) });
+    return NextResponse.json({ code: 500, message: "服务器错误" }, { status: 500 });
   }
 }
 
@@ -129,10 +130,10 @@ export async function POST(req: NextRequest) {
       [childId, personalityJson, interestsJson, strengthsJson, challengesJson, coreNeedsJson, growthGoalsJson, aiAnalysisJson, parentWeight]
     );
 
-    return NextResponse.json({ profile: result });
+    return NextResponse.json({ code: 0, message: "成功", data: { profile: result } });
   } catch (err) {
-    console.error("DB error:", err);
-    return NextResponse.json({ error: "Database error" }, { status: 500 });
+    logger.error("DB error:", { error: String(err) });
+    return NextResponse.json({ code: 500, message: "服务器错误" }, { status: 500 });
   }
 }
 
@@ -230,7 +231,7 @@ export async function PUT(req: NextRequest) {
     }
 
     if (updates.length === 0) {
-      return NextResponse.json({ error: "No fields to update" }, { status: 400 });
+      return NextResponse.json({ code: 400, message: "No fields to update" }, { status: 400 });
     }
 
     updates.push(`updated_at = NOW()`);
@@ -241,9 +242,9 @@ export async function PUT(req: NextRequest) {
       values
     );
 
-    return NextResponse.json({ profile: result, version: newVersion });
+    return NextResponse.json({ code: 0, message: "成功", data: { profile: result, version: newVersion } });
   } catch (err) {
-    console.error("DB error:", err);
-    return NextResponse.json({ error: "Database error" }, { status: 500 });
+    logger.error("DB error:", { error: String(err) });
+    return NextResponse.json({ code: 500, message: "服务器错误" }, { status: 500 });
   }
 }

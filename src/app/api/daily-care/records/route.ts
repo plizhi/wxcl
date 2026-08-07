@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query } from "@/lib/db";
 import { getAuthFromRequest } from "@/lib/auth-utils";
+import { logger } from "@/lib/logger";
 
 // GET /api/daily-care/records
 export async function GET(req: NextRequest) {
@@ -43,14 +44,13 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ code: 400, message: "请先登录" }, { status: 400 });
     }
 
-    return NextResponse.json({
+    return NextResponse.json({ code: 0, message: "成功", data: {
       records: records.map((r: any) => {
         let report = null;
         if (r.reply) {
           try {
             report = JSON.parse(r.reply);
           } catch (e) {
-            // 如果是 Markdown 或其他格式，直接作为字符串处理
             report = { growth_summary: r.reply };
           }
         }
@@ -65,9 +65,9 @@ export async function GET(req: NextRequest) {
       total: parseInt(total[0]?.count || "0"),
       page,
       limit,
-    });
+    }});
   } catch (err) {
-    console.error("DB error:", err);
-    return NextResponse.json({ error: "Database error" }, { status: 500 });
+    logger.error("DB error:", { error: String(err) });
+    return NextResponse.json({ code: 500, message: "服务器错误" }, { status: 500 });
   }
 }

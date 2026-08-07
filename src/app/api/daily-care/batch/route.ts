@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query, queryOne } from "@/lib/db";
 import { getAuthFromRequest } from "@/lib/auth-utils";
+import { logger } from "@/lib/logger";
 
 const SYSTEM_PROMPT = `你是「内在结构养育」陪伴顾问。分析多天记录，给出综合解读。
 
@@ -63,7 +64,7 @@ export async function POST(req: NextRequest) {
     const { records, childId: requestedChildId } = await req.json();
 
     if (!records || !Array.isArray(records) || records.length === 0) {
-      return NextResponse.json({ error: "records is required and must be a non-empty array" }, { status: 400 });
+      return NextResponse.json({ code: 400, message: "records is required and must be a non-empty array" }, { status: 400 });
     }
 
     let childId = requestedChildId;
@@ -84,7 +85,7 @@ export async function POST(req: NextRequest) {
 
     const deepseekApi = process.env.DEEPSEEK_API_KEY;
     if (!deepseekApi) {
-      return NextResponse.json({ error: "服务未配置" }, { status: 500 });
+      return NextResponse.json({ code: 500, message: "服务未配置" }, { status: 500 });
     }
 
     // 保存每条记录
@@ -95,7 +96,7 @@ export async function POST(req: NextRequest) {
           [childId, content]
         );
       } catch (err) {
-        console.error("Failed to save record:", err);
+        logger.error("Failed to save record:", { error: String(err) });
       }
     }
 
@@ -123,8 +124,7 @@ export async function POST(req: NextRequest) {
     });
 
     if (!response.ok) {
-      const err = await response.text();
-      return NextResponse.json({ error: err }, { status: 500 });
+      return NextResponse.json({ code: 500, message: "AI 服务异常" }, { status: 500 });
     }
 
     const data = await response.json();
@@ -143,9 +143,9 @@ export async function POST(req: NextRequest) {
       report = { growth_summary: aiContent.substring(0, 200) };
     }
 
-    return NextResponse.json(report);
+    return NextResponse.json({ code: 0, message: "成功", data: report });
   } catch (err) {
-    console.error("Batch import error:", err);
-    return NextResponse.json({ error: String(err) }, { status: 500 });
+    logger.error("Batch import error:", { error: String(err) });
+    return NextResponse.json({ code: 500, message: "服务器错误" }, { status: 500 });
   }
 }

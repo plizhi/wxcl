@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query } from "@/lib/db";
 import { getAuthFromRequest } from "@/lib/auth-utils";
+import { logger } from "@/lib/logger";
 
 const SYSTEM_PROMPTS = {
   comprehensive: `你是「内在结构养育」陪伴顾问。请分析以下多天的陪伴记录，从专业框架给出综合解读。
@@ -90,7 +91,7 @@ export async function GET(req: NextRequest) {
     }
 
     if (!records || records.length === 0) {
-      return NextResponse.json({ error: "没有找到记录" }, { status: 400 });
+      return NextResponse.json({ code: 400, message: "没有找到记录" }, { status: 400 });
     }
 
     // 构建记录摘要
@@ -106,7 +107,7 @@ export async function GET(req: NextRequest) {
 
     const deepseekApi = process.env.DEEPSEEK_API_KEY;
     if (!deepseekApi) {
-      return NextResponse.json({ error: "服务未配置" }, { status: 500 });
+      return NextResponse.json({ code: 500, message: "服务未配置" }, { status: 500 });
     }
 
     const response = await fetch("https://api.deepseek.com/chat/completions", {
@@ -127,8 +128,7 @@ export async function GET(req: NextRequest) {
     });
 
     if (!response.ok) {
-      const err = await response.text();
-      return NextResponse.json({ error: err }, { status: 500 });
+      return NextResponse.json({ code: 500, message: "AI 服务异常" }, { status: 500 });
     }
 
     const data = await response.json();
@@ -147,9 +147,9 @@ export async function GET(req: NextRequest) {
       report = { growth_summary: aiContent.substring(0, 200) };
     }
 
-    return NextResponse.json(report);
+    return NextResponse.json({ code: 0, message: "成功", data: report });
   } catch (err) {
-    console.error("Comprehensive report error:", err);
-    return NextResponse.json({ error: String(err) }, { status: 500 });
+    logger.error("Comprehensive report error:", { error: String(err) });
+    return NextResponse.json({ code: 500, message: "服务器错误" }, { status: 500 });
   }
 }

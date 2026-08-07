@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query, queryOne } from "@/lib/db";
 import { getAuthFromRequest } from "@/lib/auth-utils";
+import { logger } from "@/lib/logger";
 
 async function getUserFirstChildId(userId: string): Promise<string | null> {
   const child = await query<{ id: string }>(
@@ -51,9 +52,10 @@ export async function GET(req: NextRequest) {
     sql += ` ORDER BY created_at DESC LIMIT 20`;
 
     const reports = await query(sql, params);
-    return NextResponse.json({ reports: reports.map(transformReport) });
+    return NextResponse.json({ code: 0, message: "成功", data: { reports: reports.map(transformReport) } });
   } catch (err) {
-    return NextResponse.json({ error: "Database error" }, { status: 500 });
+    logger.error("DB error:", { error: String(err) });
+    return NextResponse.json({ code: 500, message: "服务器错误" }, { status: 500 });
   }
 }
 
@@ -78,7 +80,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ code: 403, message: "无权访问该孩子的数据" }, { status: 403 });
     }
 
-    if (!periodType) return NextResponse.json({ error: "periodType is required" }, { status: 400 });
+    if (!periodType) return NextResponse.json({ code: 400, message: "periodType is required" }, { status: 400 });
 
     // 本地日期格式化
     const fmtDate = (d: Date) => d.toLocaleDateString('en-CA'); // YYYY-MM-DD in local time
@@ -111,7 +113,7 @@ export async function POST(req: NextRequest) {
         periodEnd = fmtDate(now);
         break;
       default:
-        return NextResponse.json({ error: "invalid periodType" }, { status: 400 });
+        return NextResponse.json({ code: 400, message: "invalid periodType" }, { status: 400 });
     }
 
     const moments = await query(
@@ -152,8 +154,9 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    return NextResponse.json({ report: transformReport(result) });
+    return NextResponse.json({ code: 0, message: "成功", data: { report: transformReport(result) } });
   } catch (err) {
-    return NextResponse.json({ error: "Database error" }, { status: 500 });
+    logger.error("DB error:", { error: String(err) });
+    return NextResponse.json({ code: 500, message: "服务器错误" }, { status: 500 });
   }
 }

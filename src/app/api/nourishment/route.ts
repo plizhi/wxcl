@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query, queryOne } from "@/lib/db";
 import { getAuthFromRequest } from "@/lib/auth-utils";
+import { logger } from "@/lib/logger";
 
 async function getUserFirstChildId(userId: string): Promise<string | null> {
   const child = await query<{ id: string }>(
@@ -51,9 +52,10 @@ export async function GET(req: NextRequest) {
       [childId, limit, offset]
     );
     const { count } = await queryOne(`SELECT COUNT(*) as count FROM nourishment_moments WHERE child_id = $1`, [childId]) || {};
-    return NextResponse.json({ moments: moments.map(transform), total: parseInt(count || "0"), limit, offset });
+    return NextResponse.json({ code: 0, message: "成功", data: { moments: moments.map(transform), total: parseInt(count || "0"), limit, offset } });
   } catch (err) {
-    return NextResponse.json({ error: "Database error" }, { status: 500 });
+    logger.error("DB error:", { error: String(err) });
+    return NextResponse.json({ code: 500, message: "服务器错误" }, { status: 500 });
   }
 }
 
@@ -78,15 +80,16 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ code: 403, message: "无权访问该孩子的数据" }, { status: 403 });
     }
 
-    if (!fact) return NextResponse.json({ error: "fact is required" }, { status: 400 });
+    if (!fact) return NextResponse.json({ code: 400, message: "fact is required" }, { status: 400 });
 
     const result = await queryOne(
       `INSERT INTO nourishment_moments (child_id, fact, feeling, source, extracted_from_record_id)
        VALUES ($1, $2, $3, $4, $5) RETURNING *`,
       [childId, fact, feeling, source, extractedFromRecordId]
     );
-    return NextResponse.json({ moment: transform(result) });
+    return NextResponse.json({ code: 0, message: "成功", data: { moment: transform(result) } });
   } catch (err) {
-    return NextResponse.json({ error: "Database error" }, { status: 500 });
+    logger.error("DB error:", { error: String(err) });
+    return NextResponse.json({ code: 500, message: "服务器错误" }, { status: 500 });
   }
 }

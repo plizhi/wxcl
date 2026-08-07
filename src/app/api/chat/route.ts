@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query, queryOne } from "@/lib/db";
 import { getAuthFromRequest } from "@/lib/auth-utils";
+import { logger } from "@/lib/logger";
 
 const SYSTEM_PROMPTS = {
   daily: `你是「内在结构养育」陪伴顾问。分析今日记录，给出：1个亮点 + 1个机会。不用 JSON，用 Markdown。不超过100字。禁止说教。`,
@@ -41,7 +42,7 @@ export async function POST(req: NextRequest) {
     const { message, childId, intent: intentOverride, systemPrompt } = await req.json();
 
     if (!message) {
-      return NextResponse.json({ error: "message is required" }, { status: 400 });
+      return NextResponse.json({ code: 400, message: "message is required" }, { status: 400 });
     }
 
     const intent = intentOverride || classify(message);
@@ -49,7 +50,7 @@ export async function POST(req: NextRequest) {
 
     const deepseekApi = process.env.DEEPSEEK_API_KEY;
     if (!deepseekApi) {
-      return NextResponse.json({ reply: "服务未配置" }, { status: 500 });
+      return NextResponse.json({ code: 500, message: "服务未配置" }, { status: 500 });
     }
 
     const response = await fetch("https://api.deepseek.com/chat/completions", {
@@ -70,8 +71,7 @@ export async function POST(req: NextRequest) {
     });
 
     if (!response.ok) {
-      const err = await response.text();
-      return NextResponse.json({ error: err }, { status: 500 });
+      return NextResponse.json({ code: 500, message: "AI 服务异常" }, { status: 500 });
     }
 
     const data = await response.json();
@@ -88,7 +88,6 @@ export async function POST(req: NextRequest) {
     if (!finalChildId) {
       finalChildId = await getUserFirstChildId(auth.userId);
     }
-    // 如果仍然没有有效的 childId，记录仍然保存（兼容旧逻辑）
 
     // 保存记录到数据库
     if (finalChildId) {
@@ -98,12 +97,13 @@ export async function POST(req: NextRequest) {
           [finalChildId, message, reply, intent]
         );
       } catch (dbErr) {
-        console.error("Failed to save record:", dbErr);
+        logger.error("Failed to save record:", { error: String(dbErr) });
       }
     }
 
-    return NextResponse.json({ reply, intent });
+    return NextResponse.json({ code: 0, message: "成功", data: { reply, intent } });
   } catch (err) {
-    return NextResponse.json({ error: String(err) }, { status: 500 });
+    logger.error("Chat API error:", { error: String(err) });
+    return NextResponse.json({ code: 500, message: "服务器错误" }, { status: 500 });
   }
 }

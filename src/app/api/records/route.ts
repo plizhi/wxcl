@@ -1,12 +1,32 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query, queryOne } from "@/lib/db";
+import { getTokenFromHeader, verifyToken } from "@/lib/auth";
+import { logger } from "@/lib/logger";
 
 // GET /api/records?childId=xxx - 获取孩子的陪伴记录
 export async function GET(req: NextRequest) {
+  const authHeader = req.headers.get("authorization");
+  const token = getTokenFromHeader(authHeader);
+  const auth = token ? verifyToken(token) : null;
+
+  if (!auth) {
+    return NextResponse.json({ code: 401, message: "未登录" }, { status: 401 });
+  }
+
   const childId = req.nextUrl.searchParams.get("childId");
 
   if (!childId) {
-    return NextResponse.json({ error: "childId required" }, { status: 400 });
+    return NextResponse.json({ code: 400, message: "childId required" }, { status: 400 });
+  }
+
+  // 验证 childId 属于当前用户
+  const child = await queryOne(
+    `SELECT id FROM children WHERE id = $1 AND user_id = $2`,
+    [childId, auth.userId]
+  );
+
+  if (!child) {
+    return NextResponse.json({ code: 403, message: "无权访问" }, { status: 403 });
   }
 
   try {
@@ -18,20 +38,38 @@ export async function GET(req: NextRequest) {
        LIMIT 50`,
       [childId]
     );
-    return NextResponse.json({ records });
+    return NextResponse.json({ code: 0, message: "成功", data: { records } });
   } catch (err) {
-    console.error("DB error:", err);
-    return NextResponse.json({ error: "Database error" }, { status: 500 });
+    logger.error("DB error:", { error: String(err) });
+    return NextResponse.json({ code: 500, message: "服务器错误" }, { status: 500 });
   }
 }
 
 // POST /api/records - 创建陪伴记录
 export async function POST(req: NextRequest) {
+  const authHeader = req.headers.get("authorization");
+  const token = getTokenFromHeader(authHeader);
+  const auth = token ? verifyToken(token) : null;
+
+  if (!auth) {
+    return NextResponse.json({ code: 401, message: "未登录" }, { status: 401 });
+  }
+
   try {
     const { childId, content, reply, intent = "daily" } = await req.json();
 
     if (!childId || !content) {
-      return NextResponse.json({ error: "childId and content required" }, { status: 400 });
+      return NextResponse.json({ code: 400, message: "childId and content required" }, { status: 400 });
+    }
+
+    // 验证 childId 属于当前用户
+    const child = await queryOne(
+      `SELECT id FROM children WHERE id = $1 AND user_id = $2`,
+      [childId, auth.userId]
+    );
+
+    if (!child) {
+      return NextResponse.json({ code: 403, message: "无权访问" }, { status: 403 });
     }
 
     const record = await queryOne(
@@ -41,9 +79,9 @@ export async function POST(req: NextRequest) {
       [childId, content, reply, intent]
     );
 
-    return NextResponse.json({ record });
+    return NextResponse.json({ code: 0, message: "成功", data: { record } });
   } catch (err) {
-    console.error("DB error:", err);
-    return NextResponse.json({ error: "Database error" }, { status: 500 });
+    logger.error("DB error:", { error: String(err) });
+    return NextResponse.json({ code: 500, message: "服务器错误" }, { status: 500 });
   }
 }

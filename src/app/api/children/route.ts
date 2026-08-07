@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query, queryOne } from "@/lib/db";
 import { getAuthFromRequest } from "@/lib/auth-utils";
+import { logger } from "@/lib/logger";
 
 // GET /api/children - 获取用户的孩子列表
 export async function GET(req: NextRequest) {
@@ -21,8 +22,8 @@ export async function GET(req: NextRequest) {
     );
     return NextResponse.json({ code: 0, data: children });
   } catch (err) {
-    console.error("DB error:", err);
-    return NextResponse.json({ code: 500, message: "Database error" }, { status: 500 });
+    logger.error("DB error:", { error: String(err) });
+    return NextResponse.json({ code: 500, message: "服务器错误" }, { status: 500 });
   }
 }
 
@@ -50,8 +51,8 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ code: 0, data: child });
   } catch (err) {
-    console.error("DB error:", err);
-    return NextResponse.json({ code: 500, message: "Database error" }, { status: 500 });
+    logger.error("DB error:", { error: String(err) });
+    return NextResponse.json({ code: 500, message: "服务器错误" }, { status: 500 });
   }
 }
 
@@ -82,8 +83,8 @@ export async function PUT(req: NextRequest) {
 
     return NextResponse.json({ code: 0, data: child });
   } catch (err) {
-    console.error("DB error:", err);
-    return NextResponse.json({ code: 500, message: "Database error" }, { status: 500 });
+    logger.error("DB error:", { error: String(err) });
+    return NextResponse.json({ code: 500, message: "服务器错误" }, { status: 500 });
   }
 }
 
@@ -104,7 +105,7 @@ export async function DELETE(req: NextRequest) {
     await query("DELETE FROM children WHERE id = $1 AND user_id = $2", [id, userId]);
     return NextResponse.json({ code: 0 });
   } catch (err) {
-    console.error("DB error:", err);
-    return NextResponse.json({ code: 500, message: "Database error" }, { status: 500 });
+    logger.error("DB error:", { error: String(err) });
+    return NextResponse.json({ code: 500, message: "服务器错误" }, { status: 500 });
   }
 }

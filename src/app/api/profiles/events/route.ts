@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query, queryOne } from "@/lib/db";
 import { getAuthFromRequest } from "@/lib/auth-utils";
+import { logger } from "@/lib/logger";
 
 async function getUserFirstChildId(userId: string): Promise<string | null> {
   const child = await query<{ id: string }>(
@@ -58,7 +59,7 @@ export async function GET(req: NextRequest) {
 
     const events = await query(sql, params);
 
-    return NextResponse.json({
+    return NextResponse.json({ code: 0, message: "成功", data: {
       events: events.map(e => ({
         id: e.id,
         childId: e.child_id,
@@ -68,10 +69,10 @@ export async function GET(req: NextRequest) {
         source: e.source,
         createdAt: e.created_at,
       }))
-    });
+    }});
   } catch (err) {
-    console.error("DB error:", err);
-    return NextResponse.json({ error: "Database error" }, { status: 500 });
+    logger.error("DB error:", { error: String(err) });
+    return NextResponse.json({ code: 500, message: "服务器错误" }, { status: 500 });
   }
 }
 
@@ -99,12 +100,12 @@ export async function POST(req: NextRequest) {
     }
 
     if (!eventType || !fact) {
-      return NextResponse.json({ error: "eventType and fact required" }, { status: 400 });
+      return NextResponse.json({ code: 400, message: "eventType and fact required" }, { status: 400 });
     }
 
     const validTypes = ['strength', 'challenge', 'milestone', 'interaction', 'growth'];
     if (!validTypes.includes(eventType)) {
-      return NextResponse.json({ error: "invalid eventType" }, { status: 400 });
+      return NextResponse.json({ code: 400, message: "invalid eventType" }, { status: 400 });
     }
 
     const result = await queryOne(
@@ -114,7 +115,7 @@ export async function POST(req: NextRequest) {
       [childId, eventType, fact, interpretation, source]
     );
 
-    return NextResponse.json({
+    return NextResponse.json({ code: 0, message: "成功", data: {
       event: {
         id: result.id,
         childId: result.child_id,
@@ -124,9 +125,9 @@ export async function POST(req: NextRequest) {
         source: result.source,
         createdAt: result.created_at,
       }
-    });
+    }});
   } catch (err) {
-    console.error("DB error:", err);
-    return NextResponse.json({ error: "Database error" }, { status: 500 });
+    logger.error("DB error:", { error: String(err) });
+    return NextResponse.json({ code: 500, message: "服务器错误" }, { status: 500 });
   }
 }
