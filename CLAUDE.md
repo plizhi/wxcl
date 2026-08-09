@@ -56,3 +56,34 @@ git push origin dev-work
 如果需要测试生产效果，不要用 dev 模式（dev 模式使用 Turbopack 有缓存问题）。应该：
 1. `npm run build` 构建
 2. `npm run start` 启动生产服务器（默认 3000 端口，可通过 `-p 3008` 指定端口）
+
+---
+
+## 生产部署注意事项
+
+### 部署流程（生产环境 wxcl-v2）
+
+```bash
+cd /home/pupeng/projects/wxcl-v2
+
+# 1. 合并 dev-work 到 master
+git merge dev-work
+
+# 2. 构建
+npm run build
+
+# 3. 重启 nginx（重要！否则用户可能看到旧内容）
+sudo nginx -s reload
+
+# 4. pm2 重启（注意：pm2 restart 可能不生效，需用 delete 方式）
+pm2 delete wxcl-v2 && pm2 start npm --name "wxcl-v2" -- start
+```
+
+### 常见问题
+
+| 问题 | 原因 | 解决 |
+|-----|------|------|
+| 用户看不到更新 | nginx 缓存 | `sudo nginx -s reload` |
+| pm2 restart 无效 | fork_mode 下进程不真正重启 | `pm2 delete` + `pm2 start` |
+| JWT_SECRET 缺失 | .env.local 未配置 | 添加 `JWT_SECRET=<生成密钥>` |
+| Turbopack 编译错误 | 缓存损坏 | `rm -rf .next` + 重启 dev |
