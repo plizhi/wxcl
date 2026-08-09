@@ -30,7 +30,7 @@ export default function ProfileSetupPage() {
   const router = useRouter();
   const { toast } = useToast();
   const { user } = useAuth();
-  const { currentChildId, currentChild } = useChild();
+  const { currentChildId, childrenList } = useChild();
 
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
@@ -74,25 +74,28 @@ export default function ProfileSetupPage() {
     if (activeChildId) {
       loadProfile();
     }
-  }, [activeChildId]);
+  }, [activeChildId, childrenList]);
 
   async function loadProfile() {
     if (!activeChildId) return;
 
     setLoading(true);
     try {
+      // 从 childrenList 中查找当前孩子
+      const child = childrenList.find(c => c.id === activeChildId);
+      if (child) {
+        setName(child.name || '');
+        setGender(child.gender || '');
+        setBirthDate(child.birth_date ? child.birth_date.split('T')[0] : '');
+      }
+
+      // 获取画像数据
       const { profile } = await profileApi.getProfile(activeChildId);
       if (profile) {
-        setName(profile.personality?.details?.[0] || '');
         setPersonalityType(profile.personality?.type || '');
         setInterests(profile.interests || []);
         setStrengths(profile.strengths || []);
         setSupports(profile.growthGoals?.supports || []);
-      } else if (currentChild) {
-        // 如果没有画像，使用孩子的基本信息
-        setName(currentChild.name || '');
-        setGender(currentChild.gender || '');
-        setBirthDate(currentChild.birth_date || '');
       }
     } catch (e) {
       console.error('Failed to load profile:', e);

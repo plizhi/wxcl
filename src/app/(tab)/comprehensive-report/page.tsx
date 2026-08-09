@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { useChild } from '@/context/ChildContext';
@@ -8,7 +8,14 @@ import { dailyCareApi, DailyCareReport, DailyCareRecord } from '@/lib/api';
 import { useToast } from '@/components/ui/toast';
 import html2canvas from 'html2canvas';
 
-type TimeRange = '7days' | '30days' | 'all';
+// ========== 类型定义 ==========
+
+type PageMode = 'home' | 'select' | 'report';
+
+interface SelectedRecord extends DailyCareRecord {
+  selected: boolean;
+  reason?: string; // 推荐理由
+}
 
 interface PeriodStats {
   recordCount: number;
@@ -38,6 +45,123 @@ interface Milestone {
   icon: string;
 }
 
+// ========== 智能推荐逻辑 ==========
+
+function analyzeRecordQuality(record: DailyCareRecord): { score: number; reasons: string[] } {
+  const reasons: string[] = [];
+  let score = 0;
+
+  // 内容丰富度 (最高40分)
+  const contentLength = record.content?.length || 0;
+  if (contentLength > 200) {
+    score += 40;
+    reasons.push(`内容详细（${contentLength}字）`);
+  } else if (contentLength > 100) {
+    score += 25;
+    reasons.push(`内容较丰富（${contentLength}字）`);
+  } else if (contentLength > 50) {
+    score += 10;
+  }
+
+  // 有AI分析报告 (最高30分)
+  if (record.report) {
+    score += 15;
+    if (record.report.strengths && record.report.strengths.length > 0) {
+      score += 10;
+      reasons.push('有完整发展分析');
+    }
+    if (record.report.growth_summary) {
+      score += 5;
+    }
+  }
+
+  // 有反馈内容 (最高15分)
+  if (record.touchPoint || record.thinkingShift || record.plannedAction) {
+    score += 15;
+    reasons.push('有家长反馈');
+  }
+
+  return { score, reasons };
+}
+
+function selectBestRecords(records: DailyCareRecord[], minCount = 3, maxCount = 10): SelectedRecord[] {
+  if (records.length === 0) return [];
+
+  const sortedRecords = [...records].sort(
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  );
+
+  // 给每条记录评分
+  const scoredRecords = sortedRecords.map(record => {
+    const { score, reasons } = analyzeRecordQuality(record);
+    return { ...record, qualityScore: score, qualityReasons: reasons };
+  });
+
+  // 选择策略：
+  // 1. 必须包含最近的记录
+  // 2. 优先选择高分记录
+  // 3. 保持日期分散度（不同日期）
+  // 4. 限制数量
+
+  const selected: SelectedRecord[] = [];
+  const selectedDates = new Set<string>();
+
+  // 首先选择最高分的记录，保持日期分散
+  const sortedByScore = [...scoredRecords].sort((a, b) => b.qualityScore - a.qualityScore);
+
+  for (const record of sortedByScore) {
+    if (selected.length >= maxCount) break;
+
+    const date = new Date(record.createdAt).toISOString().split('T')[0];
+
+    // 如果日期重复，检查是否应该替换
+    if (selectedDates.has(date)) {
+      // 找已有的同日期记录，比较分数
+      const existing = selected.find(r => new Date(r.createdAt).toISOString().split('T')[0] === date);
+      if (existing && record.qualityScore > (existing.qualityScore || 0)) {
+        // 替换
+        const idx = selected.indexOf(existing);
+        selected[idx] = record;
+      }
+    } else {
+      selected.push(record);
+      selectedDates.add(date);
+    }
+  }
+
+  // 如果数量不够，补充更多记录
+  if (selected.length < minCount) {
+    for (const record of sortedByScore) {
+      if (selected.length >= minCount) break;
+      if (!selected.find(r => r.id === record.id)) {
+        selected.push(record);
+      }
+    }
+  }
+
+  // 生成推荐理由
+  return selected.map(record => {
+    const date = new Date(record.createdAt);
+    const dateStr = date.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' });
+    const { reasons } = analyzeRecordQuality(record);
+
+    let reason = '';
+    if (reasons.length > 0) {
+      reason = reasons[0];
+    } else if (record.content?.length > 50) {
+      reason = `内容丰富（${record.content.length}字）`;
+    }
+
+    return {
+      ...record,
+      selected: true,
+      reason: reason || `记录于${dateStr}`,
+    };
+  });
+}
+
+// ========== 主组件 ==========
+
 export default function ComprehensiveReportPage() {
   const router = useRouter();
   const { isLoading } = useAuth();
@@ -46,7 +170,8 @@ export default function ComprehensiveReportPage() {
   const reportRef = useRef<HTMLDivElement>(null);
 
   const [records, setRecords] = useState<DailyCareRecord[]>([]);
-  const [timeRange, setTimeRange] = useState<TimeRange>('7days');
+  const [pageMode, setPageMode] = useState<PageMode>('home');
+  const [selectedRecords, setSelectedRecords] = useState<SelectedRecord[]>([]);
   const [report, setReport] = useState<DailyCareReport | null>(null);
   const [loading, setLoading] = useState(false);
   const [weeklyComparison, setWeeklyComparison] = useState<WeeklyComparison | null>(null);
@@ -54,6 +179,7 @@ export default function ComprehensiveReportPage() {
   const [milestones, setMilestones] = useState<Milestone[]>([]);
   const [sharing, setSharing] = useState(false);
 
+  // 加载记录
   useEffect(() => {
     if (!isLoading) {
       loadRecords();
@@ -69,6 +195,8 @@ export default function ComprehensiveReportPage() {
       console.error('加载记录失败', e);
     }
   }
+
+  // ========== 里程碑分析 ==========
 
   function analyzeMilestones(recordList: DailyCareRecord[]) {
     const milestones: Milestone[] = [];
@@ -143,13 +271,11 @@ export default function ComprehensiveReportPage() {
       }
     }
 
-    // 稳定性里程碑：每周都有记录
+    // 稳定性里程碑
     if (sortedRecords.length >= 14) {
       const now = new Date();
       const twoWeeksAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
-      const recentRecords = sortedRecords.filter(
-        r => new Date(r.createdAt) >= twoWeeksAgo
-      );
+      const recentRecords = sortedRecords.filter(r => new Date(r.createdAt) >= twoWeeksAgo);
       if (recentRecords.length >= 7) {
         milestones.push({
           type: 'consistent',
@@ -163,6 +289,8 @@ export default function ComprehensiveReportPage() {
     setMilestones(milestones);
   }
 
+  // ========== 周对比分析 ==========
+
   function getWeekStart(date: Date): Date {
     const start = new Date(date);
     const day = start.getDay();
@@ -172,41 +300,12 @@ export default function ComprehensiveReportPage() {
     return start;
   }
 
-  function getDateRange() {
-    const today = new Date();
-    const todayStr = today.toISOString().split('T')[0];
-
-    if (timeRange === 'all') return { startDate: undefined, endDate: todayStr };
-
-    const days = timeRange === '7days' ? 7 : 30;
-    const start = new Date(today);
-    start.setDate(today.getDate() - days);
-    const startStr = start.toISOString().split('T')[0];
-
-    return { startDate: startStr, endDate: todayStr };
-  }
-
-  function getFilteredRecords() {
-    const { startDate, endDate } = getDateRange();
-    return records.filter((r) => {
-      const created = new Date(r.createdAt).toISOString().split('T')[0];
-      if (startDate && created < startDate) return false;
-      if (endDate && created > endDate) return false;
-      return true;
-    });
-  }
-
-  function getFilteredRecordCount() {
-    return getFilteredRecords().length;
-  }
-
   function analyzeWeeklyComparison(currentRecords: DailyCareRecord[]): WeeklyComparison {
     const today = new Date();
     const thisWeekStart = getWeekStart(today);
     const lastWeekStart = new Date(thisWeekStart);
     lastWeekStart.setDate(thisWeekStart.getDate() - 7);
 
-    // 单次遍历，同时分类记录和提取数据
     let thisWeekCount = 0;
     let lastWeekCount = 0;
     const thisWeekStrengths: string[] = [];
@@ -260,11 +359,12 @@ export default function ComprehensiveReportPage() {
     return comparison;
   }
 
+  // ========== 行动建议 ==========
+
   function generateActionSuggestions(currentRecords: DailyCareRecord[], weeklyComparison: WeeklyComparison | null) {
     const suggestions: ActionSuggestion[] = [];
     const recentRecords = currentRecords.slice(0, 10);
 
-    // 单次遍历收集所有数据
     const allStrengths: string[] = [];
     const allOpportunities: string[] = [];
     const allAdvices: string[] = [];
@@ -281,7 +381,6 @@ export default function ComprehensiveReportPage() {
     const uniqueStrengths = [...new Set(allStrengths)];
     const uniqueAdvices = [...new Set(allAdvices)];
 
-    // 基于机会窗口生成行动建议
     if (uniqueOpportunities.length > 0) {
       uniqueOpportunities.slice(0, 2).forEach((opp, i) => {
         suggestions.push({
@@ -292,7 +391,6 @@ export default function ComprehensiveReportPage() {
       });
     }
 
-    // 基于亮点生成保持建议
     if (uniqueStrengths.length > 0) {
       suggestions.push({
         action: '继续保持亮点',
@@ -301,7 +399,6 @@ export default function ComprehensiveReportPage() {
       });
     }
 
-    // 基于建议生成具体行动
     if (uniqueAdvices.length > 0) {
       suggestions.push({
         action: '落实建议',
@@ -310,7 +407,6 @@ export default function ComprehensiveReportPage() {
       });
     }
 
-    // 基于趋势给出建议
     if (weeklyComparison?.trend === 'down') {
       suggestions.push({
         action: '增加记录频率',
@@ -328,30 +424,39 @@ export default function ComprehensiveReportPage() {
     setActionSuggestions(suggestions.slice(0, 4));
   }
 
-  async function handleGenerate() {
-    const filteredCount = getFilteredRecordCount();
-    if (filteredCount < 3) {
-      toast('全景报告需要至少3条记录', 'error');
+  // ========== 快速生成 ==========
+
+  async function handleQuickGenerate() {
+    const bestRecords = selectBestRecords(records, 3, 10);
+    if (bestRecords.length < 3) {
+      toast('记录太少，无法生成全景报告', 'error');
       return;
     }
 
     setLoading(true);
     setReport(null);
 
-    const { startDate, endDate } = getDateRange();
-
     try {
-      const result = await dailyCareApi.getComprehensive(currentChildId ?? undefined, startDate, endDate);
+      // 使用选中的记录生成报告
+      const selectedIds = bestRecords.map(r => r.id);
+      const result = await dailyCareApi.getComprehensive(
+        currentChildId ?? undefined,
+        undefined,
+        undefined,
+        selectedIds
+      );
+
       if (result.error) {
         toast(result.error, 'error');
       } else {
         setReport(result);
+        setSelectedRecords(bestRecords);
 
         // 分析周对比
-        const comparison = analyzeWeeklyComparison(getFilteredRecords());
+        const comparison = analyzeWeeklyComparison(bestRecords);
+        generateActionSuggestions(bestRecords, comparison);
 
-        // 生成行动建议
-        generateActionSuggestions(getFilteredRecords(), comparison);
+        setPageMode('report');
       }
     } catch (e: any) {
       toast(e.message || '生成失败，请重试', 'error');
@@ -359,6 +464,86 @@ export default function ComprehensiveReportPage() {
       setLoading(false);
     }
   }
+
+  // ========== 精挑细选 ==========
+
+  function handleSelectRecords() {
+    const bestRecords = selectBestRecords(records, 3, 10);
+    setSelectedRecords(bestRecords);
+    setPageMode('select');
+  }
+
+  function toggleRecordSelection(recordId: string) {
+    setSelectedRecords(prev =>
+      prev.map(r =>
+        r.id === recordId ? { ...r, selected: !r.selected } : r
+      )
+    );
+  }
+
+  function addMoreRecords() {
+    // 获取当前未选中的记录
+    const selectedIds = new Set(selectedRecords.map(r => r.id));
+    const unselected = records
+      .filter(r => !selectedIds.has(r.id))
+      .map(r => {
+        const { reasons } = analyzeRecordQuality(r);
+        const date = new Date(r.createdAt);
+        const dateStr = date.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' });
+        return {
+          ...r,
+          selected: true,
+          reason: reasons[0] || `记录于${dateStr}`,
+        };
+      })
+      .slice(0, 5);
+
+    if (unselected.length === 0) {
+      toast('没有更多记录可添加', 'info');
+      return;
+    }
+
+    setSelectedRecords(prev => [...prev, ...unselected].slice(0, 10));
+  }
+
+  async function handleGenerateFromSelected() {
+    const selected = selectedRecords.filter(r => r.selected);
+    if (selected.length < 3) {
+      toast('请至少选择3条记录', 'error');
+      return;
+    }
+
+    setLoading(true);
+    setReport(null);
+
+    try {
+      const selectedIds = selected.map(r => r.id);
+      const result = await dailyCareApi.getComprehensive(
+        currentChildId ?? undefined,
+        undefined,
+        undefined,
+        selectedIds
+      );
+
+      if (result.error) {
+        toast(result.error, 'error');
+      } else {
+        setReport(result);
+        setPageMode('report');
+        setSelectedRecords(selected);
+
+        // 分析周对比
+        const comparison = analyzeWeeklyComparison(selected);
+        generateActionSuggestions(selected, comparison);
+      }
+    } catch (e: any) {
+      toast(e.message || '生成失败，请重试', 'error');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // ========== 分享 ==========
 
   async function handleShare() {
     if (!reportRef.current) return;
@@ -386,7 +571,9 @@ export default function ComprehensiveReportPage() {
     }
   }
 
-  const filteredCount = getFilteredRecordCount();
+  // ========== 渲染 ==========
+
+  const selectedCount = selectedRecords.filter(r => r.selected).length;
 
   if (isLoading) {
     return (
@@ -396,64 +583,222 @@ export default function ComprehensiveReportPage() {
     );
   }
 
-  return (
-    <div className="min-h-screen bg-gradient-to-b from-amber-50 to-white pb-20">
-      {/* Header */}
-      <div className="sticky top-0 bg-white/90 backdrop-blur z-10 border-b border-gray-100">
-        <div className="flex items-center gap-4 px-4 h-14">
-          <button onClick={() => router.back()} className="text-gray-600 text-xl">←</button>
-          <h1 className="text-lg font-medium">📊 全景报告</h1>
+  // ========== 入口选择页 ==========
+
+  if (pageMode === 'home') {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-amber-50 to-white pb-20">
+        {/* Header */}
+        <div className="sticky top-0 bg-white/90 backdrop-blur z-10 border-b border-gray-100">
+          <div className="flex items-center gap-4 px-4 h-14">
+            <button onClick={() => router.back()} className="text-gray-600 text-xl">←</button>
+            <h1 className="text-lg font-medium">📊 全景报告</h1>
+          </div>
+        </div>
+
+        <div className="px-4 py-6 space-y-4">
+          {/* 介绍 */}
+          <div className="bg-green-50 rounded-2xl p-4">
+            <p className="text-sm text-green-700 leading-relaxed">
+              💡 全景报告综合多天的记录，能帮你看到更长周期的模式和趋势。记录越多，洞察越丰富。
+            </p>
+          </div>
+
+          {/* 记录统计 */}
+          <div className="bg-white rounded-2xl p-4 shadow-sm">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-500">你的记录</p>
+                <p className="text-2xl font-bold text-gray-800">{records.length} 条</p>
+              </div>
+              <div className="text-3xl">📝</div>
+            </div>
+          </div>
+
+          {/* 快速生成入口 */}
+          <button
+            onClick={handleQuickGenerate}
+            disabled={loading || records.length < 3}
+            className="w-full bg-white rounded-2xl p-5 shadow-sm text-left disabled:opacity-50 transition-all hover:shadow-md active:scale-[0.99]"
+          >
+            <div className="flex items-center gap-4">
+              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-green-400 to-emerald-500 flex items-center justify-center text-2xl">
+                🌿
+              </div>
+              <div className="flex-1">
+                <h3 className="font-medium text-gray-800">快速生成</h3>
+                <p className="text-sm text-gray-500 mt-0.5">
+                  系统自动选择最值得分析的记录，一步生成报告
+                </p>
+              </div>
+              <div className="text-gray-400">→</div>
+            </div>
+          </button>
+
+          {/* 精挑细选入口 */}
+          <button
+            onClick={handleSelectRecords}
+            disabled={records.length < 3}
+            className="w-full bg-white rounded-2xl p-5 shadow-sm text-left disabled:opacity-50 transition-all hover:shadow-md active:scale-[0.99]"
+          >
+            <div className="flex items-center gap-4">
+              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-purple-400 to-indigo-500 flex items-center justify-center text-2xl">
+                🎯
+              </div>
+              <div className="flex-1">
+                <h3 className="font-medium text-gray-800">精挑细选</h3>
+                <p className="text-sm text-gray-500 mt-0.5">
+                  自己选择想要的记录，生成个性化报告
+                </p>
+              </div>
+              <div className="text-gray-400">→</div>
+            </div>
+          </button>
+
+          {/* 提示 */}
+          {records.length < 3 && (
+            <div className="bg-amber-50 rounded-xl p-4">
+              <p className="text-sm text-amber-700">
+                ⚠️ 全景报告需要至少3条记录才能生成，当前你有 {records.length} 条记录
+              </p>
+            </div>
+          )}
+
+          {/* 里程碑预览 */}
+          {milestones.length > 0 && (
+            <div className="bg-yellow-50 rounded-2xl p-4">
+              <h3 className="text-sm font-medium text-yellow-700 mb-2">🏆 你的里程碑</h3>
+              <div className="flex flex-wrap gap-2">
+                {milestones.slice(0, 5).map((milestone, i) => (
+                  <div key={i} className="flex items-center gap-1.5 bg-white px-2.5 py-1.5 rounded-full">
+                    <span>{milestone.icon}</span>
+                    <span className="text-xs font-medium text-gray-700">{milestone.title}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
+    );
+  }
 
-      {/* 时间范围选择 */}
-      <div className="px-4 py-4">
-        <div className="bg-white rounded-2xl p-4 shadow-sm">
-          <p className="text-sm font-medium text-gray-700 mb-3">选择时间范围</p>
-          <div className="flex gap-2">
-            {([
-              { key: '7days', label: '最近7天' },
-              { key: '30days', label: '最近30天' },
-              { key: 'all', label: '全部' },
-            ] as { key: TimeRange; label: string }[]).map(({ key, label }) => (
-              <button
-                key={key}
-                onClick={() => setTimeRange(key)}
-                className={`flex-1 py-2 rounded-full text-sm font-medium transition-all ${
-                  timeRange === key
-                    ? 'text-white'
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                }`}
-                style={timeRange === key ? { background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' } : {}}
-              >
-                {label}
-              </button>
-            ))}
+  // ========== 记录选择页 ==========
+
+  if (pageMode === 'select') {
+    const selected = selectedRecords.filter(r => r.selected);
+
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-amber-50 to-white pb-32">
+        {/* Header */}
+        <div className="sticky top-0 bg-white/90 backdrop-blur z-10 border-b border-gray-100">
+          <div className="flex items-center gap-4 px-4 h-14">
+            <button onClick={() => setPageMode('home')} className="text-gray-600 text-xl">←</button>
+            <h1 className="text-lg font-medium">🎯 精挑细选</h1>
           </div>
+        </div>
 
-          {/* 记录数量提示 */}
-          <div className="mt-3 text-center">
-            <span className={`text-sm ${filteredCount >= 3 ? 'text-green-600' : 'text-gray-400'}`}>
-              已选择 {filteredCount} 条记录
-              {filteredCount < 3 && <span className="text-red-400">（最少3条）</span>}
+        {/* 提示 */}
+        <div className="px-4 py-3">
+          <div className="bg-purple-50 rounded-xl p-3">
+            <p className="text-xs text-purple-700">
+              💡 系统已自动选择最值得分析的几条记录，你也可以手动调整
+            </p>
+          </div>
+        </div>
+
+        {/* 记录列表 */}
+        <div className="px-4 space-y-2">
+          {selectedRecords.map((record) => {
+            const date = new Date(record.createdAt);
+            const dateStr = date.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+            return (
+              <div
+                key={record.id}
+                onClick={() => toggleRecordSelection(record.id)}
+                className={`bg-white rounded-xl p-4 shadow-sm cursor-pointer transition-all active:scale-[0.99] ${
+                  record.selected ? 'ring-2 ring-purple-400' : 'opacity-60'
+                }`}
+              >
+                <div className="flex items-start gap-3">
+                  {/* 选择框 */}
+                  <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 mt-0.5 ${
+                    record.selected ? 'bg-purple-500 border-purple-500' : 'border-gray-300'
+                  }`}>
+                    {record.selected && (
+                      <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                      </svg>
+                    )}
+                  </div>
+
+                  {/* 内容 */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-xs text-gray-400">{dateStr}</span>
+                      {record.reason && (
+                        <span className="text-xs px-1.5 py-0.5 bg-purple-50 text-purple-600 rounded">
+                          {record.reason}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-sm text-gray-700 line-clamp-2">{record.content}</p>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* 添加更多 */}
+        {selectedRecords.length < 10 && (
+          <div className="px-4 py-3">
+            <button
+              onClick={addMoreRecords}
+              className="w-full py-2.5 rounded-full border-2 border-dashed border-gray-300 text-gray-500 text-sm flex items-center justify-center gap-2"
+            >
+              <span>+ </span> 添加更多记录（{selectedRecords.length}/10）
+            </button>
+          </div>
+        )}
+
+        {/* 底部固定栏 */}
+        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 px-4 py-4">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-sm text-gray-500">
+              已选择 <span className={`font-medium ${selectedCount >= 3 ? 'text-green-600' : 'text-red-500'}`}>{selectedCount}</span> 条记录
+              <span className="text-gray-400 ml-1">（最少3条）</span>
             </span>
           </div>
-
-          {/* 生成按钮 */}
           <button
-            onClick={handleGenerate}
-            disabled={loading || filteredCount < 3}
-            className="w-full mt-3 py-2.5 rounded-full text-white text-sm font-medium disabled:opacity-40 transition-all"
+            onClick={handleGenerateFromSelected}
+            disabled={loading || selectedCount < 3}
+            className="w-full py-3 rounded-full text-white text-sm font-medium disabled:opacity-40 transition-all"
             style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}
           >
             {loading ? '🌿 分析中...' : '📊 生成全景报告'}
           </button>
         </div>
       </div>
+    );
+  }
+
+  // ========== 报告展示页 ==========
+
+  return (
+    <div className="min-h-screen bg-gradient-to-b from-amber-50 to-white pb-20">
+      {/* Header */}
+      <div className="sticky top-0 bg-white/90 backdrop-blur z-10 border-b border-gray-100">
+        <div className="flex items-center gap-4 px-4 h-14">
+          <button onClick={() => setPageMode('home')} className="text-gray-600 text-xl">←</button>
+          <h1 className="text-lg font-medium">📊 全景报告</h1>
+        </div>
+      </div>
 
       {/* 加载动画 */}
       {loading && (
-        <div className="px-4">
+        <div className="px-4 py-4">
           <div className="bg-white rounded-2xl p-8 shadow-sm text-center">
             <div className="text-4xl mb-3 animate-bounce">🌿</div>
             <p className="text-gray-500 text-sm">望杏分析中，请稍候...</p>
@@ -470,7 +815,7 @@ export default function ComprehensiveReportPage() {
               <div className="text-3xl mb-2">📊</div>
               <h2 className="text-lg font-medium">全景报告</h2>
               <p className="text-xs text-gray-400 mt-1">
-                这是你 {filteredCount} 天的望杏林综合画像
+                基于 {selectedCount} 条记录的综合画像
               </p>
             </div>
 
@@ -606,23 +951,12 @@ export default function ComprehensiveReportPage() {
 
           {/* 返回按钮 */}
           <button
-            onClick={() => router.push('/home')}
+            onClick={() => setPageMode('home')}
             className="w-full py-2.5 rounded-full text-white text-sm font-medium"
             style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}
           >
-            ← 返回首页
+            ← 生成新报告
           </button>
-        </div>
-      )}
-
-      {/* 引导 */}
-      {!loading && !report && (
-        <div className="px-4 py-2">
-          <div className="bg-green-50 rounded-xl p-4">
-            <p className="text-xs text-green-700 leading-relaxed">
-              💡 全景报告综合多天的记录，能帮你看到更长周期的模式和趋势。记录越多，洞察越丰富。
-            </p>
-          </div>
         </div>
       )}
     </div>

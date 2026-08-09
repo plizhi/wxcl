@@ -19,10 +19,11 @@ export interface ChildProfile {
   id?: string;
   name?: string;
   gender: 'boy' | 'girl' | '';
-  grade: string;
-  personality: 'introvert' | 'extrovert' | 'mixed' | '';
-  mainConcerns: string[];
-  changeGoal: string[];
+  grade?: string;
+  birth_date?: string;
+  personality?: 'introvert' | 'extrovert' | 'mixed' | '';
+  mainConcerns?: string[];
+  changeGoal?: string[];
   createdAt?: string;
 }
 

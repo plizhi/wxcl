@@ -108,7 +108,20 @@ export const dailyCareApi = {
       method: "POST",
       body: JSON.stringify(feedback),
     }),
-  getComprehensive: (childId?: string, startDate?: string, endDate?: string) => {
+  getComprehensive: (childId?: string, startDate?: string, endDate?: string, recordIds?: string[]) => {
+    // 优先使用 recordIds（POST），否则使用日期范围（GET）
+    if (recordIds && recordIds.length > 0) {
+      const params = new URLSearchParams();
+      if (startDate) params.set("startDate", startDate);
+      if (endDate) params.set("endDate", endDate);
+      return request<DailyCareReport>(
+        "/api/daily-care/comprehensive" + (params.toString() ? "?" + params.toString() : ""),
+        {
+          method: "POST",
+          body: JSON.stringify({ recordIds }),
+        }
+      );
+    }
     const params = new URLSearchParams();
     if (startDate) params.set("startDate", startDate);
     if (endDate) params.set("endDate", endDate);

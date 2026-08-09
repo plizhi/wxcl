@@ -35,8 +35,8 @@ export default function DailyCarePage() {
         },
       });
       const data = await res.json();
-      if (data.records) {
-        setRecords(data.records);
+      if (data.data?.records) {
+        setRecords(data.data.records);
       }
     } catch (e) {
       console.error('加载记录失败', e);
