@@ -96,7 +96,7 @@ function selectBestRecords(records: DailyCareRecord[], minCount = 3, maxCount = 
   // 给每条记录评分
   const scoredRecords = sortedRecords.map(record => {
     const { score, reasons } = analyzeRecordQuality(record);
-    return { ...record, qualityScore: score, qualityReasons: reasons };
+    return { ...record, selected: true as boolean, qualityScore: score, qualityReasons: reasons };
   });
 
   // 选择策略：
