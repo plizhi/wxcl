@@ -217,9 +217,9 @@ export default function OnboardingPage() {
                     {initialReport.opportunity_axis1.description}
                   </div>
                 )}
-                {initialReport.opportunity_axis2 && initialReport.opportunity_axis2.dimension && (
+                {initialReport.opportunity_axis2 && initialReport.opportunity_axis2.element && (
                   <div className="text-xs text-gray-700">
-                    <span className="font-medium">{initialReport.opportunity_axis2.dimension}：</span>
+                    <span className="font-medium">{initialReport.opportunity_axis2.element}：</span>
                     {initialReport.opportunity_axis2.description}
                   </div>
                 )}

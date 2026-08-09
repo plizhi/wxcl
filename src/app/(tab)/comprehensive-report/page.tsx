@@ -15,6 +15,8 @@ type PageMode = 'home' | 'select' | 'report';
 interface SelectedRecord extends DailyCareRecord {
   selected: boolean;
   reason?: string; // 推荐理由
+  qualityScore?: number;
+  qualityReasons?: string[];
 }
 
 interface PeriodStats {
