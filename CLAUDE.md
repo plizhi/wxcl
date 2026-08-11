@@ -21,6 +21,24 @@
 
 ---
 
+## 对话呈现规范
+
+**重要：确保用户的消息和我的回复都完整呈现在终端里**
+
+- 收到用户消息后，在回复时先引用/复述用户的原话
+- 不要只输出我的分析，要先展示"你说了什么"
+- 格式示例：
+  ```
+  你：xxxxx
+  我：xxxxx
+  ```
+
+**为什么这样做：**
+- 确保对话完整呈现在终端，不遗漏用户的消息
+- 用户能清楚看到自己发送的内容和我的回复
+
+---
+
 ## 开发环境配置
 
 | 项目 | 值 |
@@ -66,13 +84,14 @@ git push origin dev-work
 ## Turbopack 缓存问题处理
 
 如果 `npm run dev` 出现 Turbopack 崩溃或编译异常（如 "Failed to restore task data"）：
-1. 先 `pkill -f "next-server"` 杀掉所有 next 进程
-2. 再 `rm -rf .next` 清理缓存
-3. 最后 `npm run dev` 重启
 
-如果需要测试生产效果，不要用 dev 模式（dev 模式使用 Turbopack 有缓存问题）。应该：
-1. `npm run build` 构建
-2. `npm run start` 启动生产服务器（默认 3000 端口，可通过 `-p 3008` 指定端口）
+**标准部署流程（开发环境）：**
+1. `pkill -f "next-server"` 杀掉所有 next 进程
+2. `rm -rf .next` 清理缓存
+3. `npm run build` 构建
+4. 服务器自动在 3008 端口启动
+
+**注意：** dev 模式有 Turbopack 缓存问题，加载慢或卡住时用 build 模式测试。
 
 ---
 

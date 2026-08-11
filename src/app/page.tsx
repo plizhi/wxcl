@@ -5,10 +5,48 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
 
+// 简单的 Markdown 转 HTML 函数
+function simpleMarkdownToHtml(markdown: string): string {
+  let html = markdown
+    // 转义 HTML
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    // 标题
+    .replace(/^## (.+)$/gm, '<h3 class="text-sm font-medium text-stone-700 mt-4 mb-2">$1</h3>')
+    .replace(/^# (.+)$/gm, '<h2 class="text-base font-medium text-stone-700 mt-4 mb-2">$1</h2>')
+    // 粗体
+    .replace(/\*\*(.+?)\*\*/g, '<strong class="font-medium">$1</strong>')
+    // 列表项
+    .replace(/^- (.+)$/gm, '<li class="ml-4 text-stone-600">$1</li>')
+    // 表格（简化处理）
+    .replace(/\|(.+)\|/g, (match) => {
+      const cells = match.split('|').filter(c => c.trim());
+      if (cells.some(c => c.trim().match(/^-+$/))) {
+        return ''; // 跳过分隔行
+      }
+      return '<tr>' + cells.map(c => `<td class="px-2 py-1 text-stone-600">${c.trim()}</td>`).join('') + '</tr>';
+    })
+    // 换行
+    .replace(/\n\n/g, '</p><p class="mt-2">')
+    .replace(/\n/g, '<br/>');
+
+  // 包裹列表
+  html = html.replace(/(<li.*<\/li>)/g, '<ul class="list-disc">$1</ul>');
+  // 包裹表格
+  if (html.includes('<tr>')) {
+    html = html.replace(/(<tr>)/g, '<table class="w-full text-xs my-3">$1');
+    html = html.replace(/(<\/tr>)/g, '$1</table>');
+  }
+
+  return `<p class="mt-2">${html}</p>`;
+}
+
 export default function LandingPage() {
   const router = useRouter();
   const { isLoggedIn, isLoading } = useAuth();
   const [message, setMessage] = useState('');
+  const [childAge, setChildAge] = useState('');
   const [reply, setReply] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -33,7 +71,7 @@ export default function LandingPage() {
       const res = await fetch('/api/trial', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message }),
+        body: JSON.stringify({ message, childAge }),
       });
       const data = await res.json();
       if (data.code === 0) {
@@ -154,6 +192,13 @@ export default function LandingPage() {
           </div>
 
           <div className="bg-gradient-to-br from-amber-50 to-orange-50 rounded-2xl p-6 md:p-8">
+            <input
+              type="text"
+              placeholder="孩子大概几岁？（如：6岁、小学二年级）"
+              value={childAge}
+              onChange={(e) => setChildAge(e.target.value)}
+              className="w-full px-4 py-3 border border-amber-200 rounded-xl text-base text-center focus:outline-none focus:ring-2 focus:ring-amber-300 focus:border-amber-400 mb-4"
+            />
             <textarea
               value={message}
               onChange={(e) => setMessage(e.target.value)}
@@ -182,7 +227,10 @@ export default function LandingPage() {
             {reply && (
               <div className="mt-6 p-5 bg-white rounded-xl border border-amber-100">
                 <div className="text-xs text-amber-600 font-medium mb-2">💜 内在结构养育视角</div>
-                <p className="text-stone-700 text-sm leading-relaxed whitespace-pre-line">{reply}</p>
+                <div
+                  className="text-stone-700 text-sm leading-relaxed markdown-content"
+                  dangerouslySetInnerHTML={{ __html: simpleMarkdownToHtml(reply) }}
+                />
               </div>
             )}
           </div>
