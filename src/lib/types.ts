@@ -175,6 +175,11 @@ export interface DailyCareReport {
     description: string;
     suggestion: string;
   };
+  opportunity_axis3?: {
+    theme: string;
+    description: string;
+    suggestion: string;
+  };
   advice?: string;
   reflection_prompt?: string;
   no_records?: boolean;

@@ -1,28 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
-import { query, queryOne } from "@/lib/db";
+import { prisma } from "@/lib/prisma";
 import { getAuthFromRequest } from "@/lib/auth-utils";
 import { logger } from "@/lib/logger";
 
 async function getUserFirstChildId(userId: string): Promise<string | null> {
-  const child = await query<{ id: string }>(
-    `SELECT id FROM children WHERE user_id = $1 ORDER BY created_at ASC LIMIT 1`,
-    [userId]
-  );
-  return child[0]?.id || null;
+  const child = await prisma.child.findFirst({
+    where: { userId },
+    orderBy: { createdAt: "asc" },
+    select: { id: true },
+  });
+  return child?.id ?? null;
 }
 
 async function validateChildId(userId: string, childId: string): Promise<boolean> {
-  const child = await query<{ id: string }>(
-    `SELECT id FROM children WHERE id = $1 AND user_id = $2`,
-    [childId, userId]
-  );
-  return child.length > 0;
+  const child = await prisma.child.findFirst({
+    where: { id: childId, userId },
+    select: { id: true },
+  });
+  return !!child;
 }
-
-const transformReport = (r: any) => ({
-  id: r.id, childId: r.child_id, periodType: r.period_type, periodStart: r.period_start,
-  periodEnd: r.period_end, content: r.content, momentCount: r.moment_count, createdAt: r.created_at,
-});
 
 export async function GET(req: NextRequest) {
   const auth = getAuthFromRequest(req);
@@ -46,13 +42,26 @@ export async function GET(req: NextRequest) {
   const periodType = req.nextUrl.searchParams.get("periodType");
 
   try {
-    let sql = `SELECT * FROM nourishment_reports WHERE child_id = $1`;
-    const params: any[] = [childId];
-    if (periodType) { sql += ` AND period_type = $2`; params.push(periodType); }
-    sql += ` ORDER BY created_at DESC LIMIT 20`;
+    const reports = await prisma.nourishmentReport.findMany({
+      where: {
+        childId,
+        ...(periodType ? { periodType } : {}),
+      },
+      select: {
+        id: true,
+        childId: true,
+        periodType: true,
+        periodStart: true,
+        periodEnd: true,
+        content: true,
+        momentCount: true,
+        createdAt: true,
+      },
+      orderBy: { createdAt: "desc" },
+      take: 20,
+    });
 
-    const reports = await query(sql, params);
-    return NextResponse.json({ code: 0, message: "成功", data: { reports: reports.map(transformReport) } });
+    return NextResponse.json({ code: 0, message: "成功", data: { reports } });
   } catch (err) {
     logger.error("DB error:", { error: String(err) });
     return NextResponse.json({ code: 500, message: "服务器错误" }, { status: 500 });
@@ -80,11 +89,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ code: 403, message: "无权访问该孩子的数据" }, { status: 403 });
     }
 
-    if (!periodType) return NextResponse.json({ code: 400, message: "periodType is required" }, { status: 400 });
+    if (!periodType) {
+      return NextResponse.json({ code: 400, message: "periodType is required" }, { status: 400 });
+    }
 
-    // 本地日期格式化
-    const fmtDate = (d: Date) => d.toLocaleDateString('en-CA'); // YYYY-MM-DD in local time
-
+    // 计算日期区间
+    const fmtDate = (d: Date) => d.toLocaleDateString("en-CA");
     const now = new Date();
     const year = now.getFullYear();
     const month = now.getMonth();
@@ -93,22 +103,22 @@ export async function POST(req: NextRequest) {
     let periodStart: string, periodEnd: string;
 
     switch (periodType) {
-      case 'weekly':
+      case "weekly":
         const weekAgo = new Date(now);
         weekAgo.setDate(date - 7);
         periodStart = fmtDate(weekAgo);
         periodEnd = fmtDate(now);
         break;
-      case 'monthly':
+      case "monthly":
         periodStart = fmtDate(new Date(year, month - 1, 1));
         periodEnd = fmtDate(new Date(year, month, 0));
         break;
-      case 'quarterly':
+      case "quarterly":
         const quarterMonth = Math.floor(month / 3) * 3;
         periodStart = fmtDate(new Date(year, quarterMonth - 3, 1));
         periodEnd = fmtDate(new Date(year, quarterMonth, 0));
         break;
-      case 'yearly':
+      case "yearly":
         periodStart = fmtDate(new Date(year - 1, month, date));
         periodEnd = fmtDate(now);
         break;
@@ -116,45 +126,58 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ code: 400, message: "invalid periodType" }, { status: 400 });
     }
 
-    const moments = await query(
-      `SELECT fact, feeling FROM nourishment_moments WHERE child_id = $1 AND DATE(created_at) >= $2 AND DATE(created_at) <= $3`,
-      [childId, periodStart, periodEnd]
-    );
+    const moments = await prisma.nourishmentMoment.findMany({
+      where: {
+        childId,
+        createdAt: {
+          gte: new Date(periodStart),
+          lte: new Date(periodEnd + "T23:59:59"),
+        },
+      },
+      select: { fact: true, feeling: true },
+    });
 
     const reportContent = {
       periodSummary: `${periodStart} - ${periodEnd} 滋养回顾`,
       momentCount: moments.length,
-      feelings: moments.map(m => m.feeling).filter(Boolean),
-      facts: moments.map(m => m.fact),
-      reflection: moments.length > 0
-        ? `这个阶段你被孩子滋养了 ${moments.length} 次，这些温暖的时刻值得被记住。`
-        : '还没有记录滋养时刻，去发现那些被孩子滋养的小确幸吧。',
+      feelings: moments.map((m) => m.feeling).filter(Boolean),
+      facts: moments.map((m) => m.fact),
+      reflection:
+        moments.length > 0
+          ? `这个阶段你被孩子滋养了 ${moments.length} 次，这些温暖的时刻值得被记住。`
+          : "还没有记录滋养时刻，去发现那些被孩子滋养的小确幸吧。",
     };
 
-    // 检查是否已存在该 childId + periodType 的报告
-    const existing = await query(
-      `SELECT id FROM nourishment_reports WHERE child_id = $1 AND period_type = $2`,
-      [childId, periodType]
-    );
+    // upsert 报告
+    const report = await prisma.nourishmentReport.upsert({
+      where: { childId_periodType: { childId, periodType } },
+      create: {
+        childId,
+        periodType,
+        periodStart: new Date(periodStart),
+        periodEnd: new Date(periodEnd),
+        content: reportContent as object,
+        momentCount: moments.length,
+      },
+      update: {
+        periodStart: new Date(periodStart),
+        periodEnd: new Date(periodEnd),
+        content: reportContent as object,
+        momentCount: moments.length,
+      },
+      select: {
+        id: true,
+        childId: true,
+        periodType: true,
+        periodStart: true,
+        periodEnd: true,
+        content: true,
+        momentCount: true,
+        createdAt: true,
+      },
+    });
 
-    let result;
-    if (existing.length > 0) {
-      // 更新已有报告
-      result = await queryOne(
-        `UPDATE nourishment_reports SET period_start = $3, period_end = $4, content = $5, moment_count = $6, created_at = NOW()
-         WHERE id = $1 RETURNING *`,
-        [existing[0].id, childId, periodStart, periodEnd, JSON.stringify(reportContent), moments.length]
-      );
-    } else {
-      // 新建报告
-      result = await queryOne(
-        `INSERT INTO nourishment_reports (child_id, period_type, period_start, period_end, content, moment_count)
-         VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-        [childId, periodType, periodStart, periodEnd, JSON.stringify(reportContent), moments.length]
-      );
-    }
-
-    return NextResponse.json({ code: 0, message: "成功", data: { report: transformReport(result) } });
+    return NextResponse.json({ code: 0, message: "成功", data: { report } });
   } catch (err) {
     logger.error("DB error:", { error: String(err) });
     return NextResponse.json({ code: 500, message: "服务器错误" }, { status: 500 });

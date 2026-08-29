@@ -7,6 +7,7 @@ interface CallAIOptions {
   maxTokens?: number;
   retries?: number;
   model?: string;
+  jsonMode?: boolean;
 }
 
 interface AIResponse {
@@ -21,6 +22,7 @@ export async function callAI(options: CallAIOptions): Promise<AIResponse> {
     maxTokens = 1000,
     retries = 3,
     model = DEFAULT_MODEL,
+    jsonMode = false,
   } = options;
 
   const apiKey = process.env.DEEPSEEK_API_KEY;
@@ -32,6 +34,16 @@ export async function callAI(options: CallAIOptions): Promise<AIResponse> {
     ? [{ role: 'system', content: systemPrompt }, ...messages]
     : messages;
 
+  const body: Record<string, unknown> = {
+    model,
+    messages: allMessages,
+    max_tokens: maxTokens,
+  };
+
+  if (jsonMode) {
+    body.response_format = { type: 'json_object' };
+  }
+
   let lastError: Error | null = null;
 
   for (let attempt = 0; attempt < retries; attempt++) {
@@ -42,11 +54,7 @@ export async function callAI(options: CallAIOptions): Promise<AIResponse> {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${apiKey}`,
         },
-        body: JSON.stringify({
-          model,
-          messages: allMessages,
-          max_tokens: maxTokens,
-        }),
+        body: JSON.stringify(body),
       });
 
       if (!response.ok) {
@@ -72,14 +80,11 @@ export async function callAI(options: CallAIOptions): Promise<AIResponse> {
   throw new Error(`AI 调用失败，已重试 ${retries} 次: ${lastError?.message}`);
 }
 
-export function parseAIResponse<T = any>(content: string): T | null {
+export function parseAIResponse<T = unknown>(content: string): T | null {
   try {
-    const jsonMatch = content.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      return JSON.parse(jsonMatch[0]) as T;
-    }
-    return null;
-  } catch {
+    return JSON.parse(content) as T;
+  } catch (error) {
+    console.error('Failed to parse AI JSON response:', error, 'Raw content:', content);
     return null;
   }
 }

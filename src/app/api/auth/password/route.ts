@@ -1,6 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { query } from '@/lib/db';
-import { getTokenFromHeader, verifyToken, hashPassword } from '@/lib/auth';
+import { NextRequest, NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
+import { getTokenFromHeader, verifyToken, hashPassword } from "@/lib/auth";
 
 export async function PUT(request: NextRequest) {
   const authHeader = request.headers.get("authorization");
@@ -20,14 +20,14 @@ export async function PUT(request: NextRequest) {
 
     const hashedPassword = hashPassword(password);
 
-    await query(
-      'UPDATE users SET password = $1, updated_at = NOW() WHERE id = $2',
-      [hashedPassword, auth.userId]
-    );
+    await prisma.user.update({
+      where: { id: auth.userId },
+      data: { password: hashedPassword },
+    });
 
     return NextResponse.json({ code: 0, message: "密码设置成功" });
   } catch (error) {
-    console.error('set password error:', error);
+    console.error("set password error:", error);
     return NextResponse.json({ code: 500, message: "服务器错误" }, { status: 500 });
   }
 }

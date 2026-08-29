@@ -1,5 +1,6 @@
 {
   "name": "wxcl-v2",
+  "type": "module",
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
@@ -7,14 +8,21 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "postinstall": "prisma skills sync || exit 0",
+    "contract:emit": "prisma contract emit",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@prisma/client": "^5.22.0",
+    "@prisma/orm-postgres": "^8.0.0-rc.8",
     "@types/pg": "^8.20.0",
     "bcryptjs": "^3.0.3",
+    "dotenv": "^17.4.2",
     "html2canvas": "^1.4.1",
     "jsonwebtoken": "^9.0.3",
     "next": "^16.2.10",
@@ -24,14 +32,18 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.3.3",
+    "@testing-library/dom": "^10.4.1",
+    "@testing-library/react": "^16.3.3",
     "@types/bcryptjs": "^2.4.6",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^26.1.1",
     "@types/react": "^19.2.17",
     "autoprefixer": "^10.5.4",
     "postcss": "^8.5.19",
+    "prisma": "^5.22.0",
     "tailwindcss": "^4.3.3",
     "tsx": "^4.23.1",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.11"
   }
 }
