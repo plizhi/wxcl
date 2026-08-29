@@ -24,7 +24,7 @@ describe('prisma singleton', () => {
     ];
 
     for (const model of expectedModels) {
-      expect((prisma as Record<string, unknown>)[model]).toBeDefined();
+      expect((prisma as unknown as Record<string, unknown>)[model]).toBeDefined();
     }
   });
 });

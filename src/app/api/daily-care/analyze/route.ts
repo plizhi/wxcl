@@ -172,7 +172,9 @@ async function saveOpportunities(
   opportunities: Array<{ dimension?: string; description?: string; suggestion?: string } | null>
 ) {
   for (const opp of opportunities) {
-    if (!opp || !opp.dimension || !opp.description) continue;
+    if (!opp || !opp.dimension || !opp.description) {
+      continue;
+    }
 
     const existing = await prisma.profileOpportunity.findFirst({
       where: {
@@ -290,7 +292,7 @@ export async function POST(req: NextRequest) {
           data: {
             childId,
             content,
-            reply: report as unknown as string,
+            reply: JSON.stringify(report),
             intent: intent as "daily" | "emergency" | "nourishment",
           },
           select: { id: true },
