@@ -1,71 +1,63 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { query, queryOne } from '@/lib/db';
-import { generateToken } from '@/lib/auth';
+import { NextRequest, NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
+import { generateToken } from "@/lib/auth";
 
 export async function POST(request: NextRequest) {
   try {
     const { phone, code } = await request.json();
 
     if (!code) {
-      return NextResponse.json({ code: 400, message: '请输入激活码' }, { status: 400 });
+      return NextResponse.json({ code: 400, message: "请输入激活码" }, { status: 400 });
     }
 
-    // 查找有效的激活码
-    // 支持：绑定手机的激活码（按手机号+激活码匹配）或 通用激活码（仅按激活码匹配）
-    const session = await queryOne<{
-      id: string;
-      phone: string;
-      code: string;
-      expires_at: Date;
-      used: boolean;
-    }>(
-      `SELECT id, phone, code, expires_at, used FROM auth_sessions
-       WHERE code = $1 AND expires_at > NOW()
-       ORDER BY created_at DESC LIMIT 1`,
-      [code]
-    );
+    const session = await prisma.authSession.findFirst({
+      where: {
+        code,
+        expiresAt: { gt: new Date() },
+      },
+      orderBy: { createdAt: "desc" },
+    });
 
     if (!session) {
-      return NextResponse.json({ code: 400, message: '激活码无效或已过期' }, { status: 400 });
+      return NextResponse.json({ code: 400, message: "激活码无效或已过期" }, { status: 400 });
     }
 
     if (session.used) {
-      return NextResponse.json({ code: 400, message: '激活码已被使用' }, { status: 400 });
+      return NextResponse.json({ code: 400, message: "激活码已被使用" }, { status: 400 });
     }
 
-    // 如果激活码绑定了手机号，验证手机号是否匹配
     if (session.phone && phone && session.phone !== phone) {
-      return NextResponse.json({ code: 400, message: '激活码与手机号不匹配' }, { status: 400 });
+      return NextResponse.json({ code: 400, message: "激活码与手机号不匹配" }, { status: 400 });
     }
 
-    // 标记激活码已使用
-    await query('UPDATE auth_sessions SET used = TRUE WHERE id = $1', [session.id]);
+    await prisma.authSession.update({
+      where: { id: session.id },
+      data: { used: true },
+    });
 
-    // 确定用户手机号（优先使用激活码绑定的手机号，如果没有则用用户输入的）
-    const userPhone = session.phone || phone || '';
+    const userPhone = session.phone || phone || "";
 
-    // 查找或创建用户
-    let user = await queryOne<{ id: string }>('SELECT id FROM users WHERE phone = $1', [userPhone]);
+    let user = await prisma.user.findUnique({
+      where: { phone: userPhone },
+      select: { id: true },
+    });
 
     if (!user) {
-      // 新用户，创建记录
-      const result = await query<{ id: string }>(
-        'INSERT INTO users (phone, nickname) VALUES ($1, $2) RETURNING id',
-        [userPhone, '用户']
-      );
-      user = result[0];
+      user = await prisma.user.create({
+        data: { phone: userPhone, nickname: "用户" },
+        select: { id: true },
+      });
     }
 
-    // 生成 token
     const token = generateToken({ userId: user.id, phone: userPhone });
 
     return NextResponse.json({
       code: 0,
-      message: '验证成功',
-      data: { token, userId: user.id }
+      message: "验证成功",
+      data: { token, userId: user.id },
     });
   } catch (error) {
-    console.error('verify error:', error);
-    return NextResponse.json({ code: 500, message: '服务器错误' }, { status: 500 });
+    console.error("verify error:", error);
+    return NextResponse.json({ code: 500, message: "服务器错误" }, { status: 500 });
   }
 }

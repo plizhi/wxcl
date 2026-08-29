@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { query, queryOne } from "@/lib/db";
+import { prisma } from "@/lib/prisma";
 import { getAuthFromRequest } from "@/lib/auth-utils";
-import { logger } from "@/lib/logger";
 
 // GET /api/children - 获取用户的孩子列表
 export async function GET(req: NextRequest) {
@@ -10,19 +9,21 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ code: 401, message: "未登录" }, { status: 401 });
   }
 
-  const userId = auth.userId;
-
   try {
-    const children = await query(
-      `SELECT id, name, gender, birth_date, created_at
-       FROM children
-       WHERE user_id = $1
-       ORDER BY created_at DESC`,
-      [userId]
-    );
+    const children = await prisma.child.findMany({
+      where: { userId: auth.userId },
+      select: {
+        id: true,
+        name: true,
+        gender: true,
+        birthDate: true,
+        createdAt: true,
+      },
+      orderBy: { createdAt: "desc" },
+    });
     return NextResponse.json({ code: 0, data: children });
   } catch (err) {
-    logger.error("DB error:", { error: String(err) });
+    console.error("DB error:", err);
     return NextResponse.json({ code: 500, message: "服务器错误" }, { status: 500 });
   }
 }
@@ -33,25 +34,33 @@ export async function POST(req: NextRequest) {
   if (!auth) {
     return NextResponse.json({ code: 401, message: "未登录" }, { status: 401 });
   }
-  const userId = auth.userId;
 
   try {
     const { name, gender, birthDate } = await req.json();
 
-    if (!name || !gender) {
-      return NextResponse.json({ code: 400, message: "name and gender required" }, { status: 400 });
+    if (!name || !gender || !birthDate) {
+      return NextResponse.json({ code: 400, message: "name, gender and birthDate required" }, { status: 400 });
     }
 
-    const child = await queryOne(
-      `INSERT INTO children (user_id, name, gender, birth_date, created_at)
-       VALUES ($1, $2, $3, $4, NOW())
-       RETURNING id, name, gender, birth_date, created_at`,
-      [userId, name, gender, birthDate || null]
-    );
+    const child = await prisma.child.create({
+      data: {
+        userId: auth.userId,
+        name,
+        gender,
+        birthDate: new Date(birthDate),
+      },
+      select: {
+        id: true,
+        name: true,
+        gender: true,
+        birthDate: true,
+        createdAt: true,
+      },
+    });
 
     return NextResponse.json({ code: 0, data: child });
   } catch (err) {
-    logger.error("DB error:", { error: String(err) });
+    console.error("DB error:", err);
     return NextResponse.json({ code: 500, message: "服务器错误" }, { status: 500 });
   }
 }
@@ -62,7 +71,6 @@ export async function PUT(req: NextRequest) {
   if (!auth) {
     return NextResponse.json({ code: 401, message: "未登录" }, { status: 401 });
   }
-  const userId = auth.userId;
 
   try {
     const { id, name, gender, birthDate } = await req.json();
@@ -71,19 +79,35 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ code: 400, message: "id required" }, { status: 400 });
     }
 
-    const child = await queryOne(
-      `UPDATE children
-       SET name = COALESCE($1, name),
-           gender = COALESCE($2, gender),
-           birth_date = COALESCE($3, birth_date)
-       WHERE id = $4 AND user_id = $5
-       RETURNING id, name, gender, birth_date, created_at`,
-      [name, gender, birthDate, id, userId]
-    );
+    // 先验证是否属于当前用户
+    const existing = await prisma.child.findFirst({
+      where: { id, userId: auth.userId },
+      select: { id: true },
+    });
+
+    if (!existing) {
+      return NextResponse.json({ code: 403, message: "无权访问" }, { status: 403 });
+    }
+
+    const child = await prisma.child.update({
+      where: { id },
+      data: {
+        ...(name !== undefined && { name }),
+        ...(gender !== undefined && { gender }),
+        ...(birthDate !== undefined && { birthDate: new Date(birthDate) }),
+      },
+      select: {
+        id: true,
+        name: true,
+        gender: true,
+        birthDate: true,
+        createdAt: true,
+      },
+    });
 
     return NextResponse.json({ code: 0, data: child });
   } catch (err) {
-    logger.error("DB error:", { error: String(err) });
+    console.error("DB error:", err);
     return NextResponse.json({ code: 500, message: "服务器错误" }, { status: 500 });
   }
 }
@@ -94,7 +118,6 @@ export async function DELETE(req: NextRequest) {
   if (!auth) {
     return NextResponse.json({ code: 401, message: "未登录" }, { status: 401 });
   }
-  const userId = auth.userId;
 
   const id = req.nextUrl.searchParams.get("id");
   if (!id) {
@@ -102,10 +125,20 @@ export async function DELETE(req: NextRequest) {
   }
 
   try {
-    await query("DELETE FROM children WHERE id = $1 AND user_id = $2", [id, userId]);
+    // 先验证是否属于当前用户
+    const existing = await prisma.child.findFirst({
+      where: { id, userId: auth.userId },
+      select: { id: true },
+    });
+
+    if (!existing) {
+      return NextResponse.json({ code: 403, message: "无权访问" }, { status: 403 });
+    }
+
+    await prisma.child.delete({ where: { id } });
     return NextResponse.json({ code: 0 });
   } catch (err) {
-    logger.error("DB error:", { error: String(err) });
+    console.error("DB error:", err);
     return NextResponse.json({ code: 500, message: "服务器错误" }, { status: 500 });
   }
 }

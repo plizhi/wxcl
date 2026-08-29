@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { query, queryOne } from "@/lib/db";
+import { prisma } from "@/lib/prisma";
 import { getAuthFromRequest } from "@/lib/auth-utils";
+import { callAI } from "@/lib/ai";
 import { logger } from "@/lib/logger";
 
 const SYSTEM_PROMPTS = {
@@ -17,18 +18,19 @@ function classify(text: string): "daily" | "question" | "chat" {
 }
 
 async function getUserFirstChildId(userId: string): Promise<string | null> {
-  const child = await queryOne<{ id: string }>(
-    `SELECT id FROM children WHERE user_id = $1 ORDER BY created_at ASC LIMIT 1`,
-    [userId]
-  );
-  return child?.id || null;
+  const child = await prisma.child.findFirst({
+    where: { userId },
+    orderBy: { createdAt: "asc" },
+    select: { id: true },
+  });
+  return child?.id ?? null;
 }
 
 async function validateChildId(userId: string, childId: string): Promise<boolean> {
-  const child = await queryOne<{ id: string }>(
-    `SELECT id FROM children WHERE id = $1 AND user_id = $2`,
-    [childId, userId]
-  );
+  const child = await prisma.child.findFirst({
+    where: { id: childId, userId },
+    select: { id: true },
+  });
   return !!child;
 }
 
@@ -46,36 +48,20 @@ export async function POST(req: NextRequest) {
     }
 
     const intent = intentOverride || classify(message);
-    const finalSystemPrompt = systemPrompt || SYSTEM_PROMPTS[intent as keyof typeof SYSTEM_PROMPTS] || SYSTEM_PROMPTS.chat;
+    const finalSystemPrompt =
+      systemPrompt ||
+      SYSTEM_PROMPTS[intent as keyof typeof SYSTEM_PROMPTS] ||
+      SYSTEM_PROMPTS.chat;
 
-    const deepseekApi = process.env.DEEPSEEK_API_KEY;
-    if (!deepseekApi) {
-      return NextResponse.json({ code: 500, message: "服务未配置" }, { status: 500 });
-    }
-
-    const response = await fetch("https://api.deepseek.com/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${deepseekApi}`,
-      },
-      body: JSON.stringify({
-        model: "deepseek-chat",
-        messages: [
-          { role: "system", content: finalSystemPrompt },
-          { role: "user", content: message },
-        ],
-        max_tokens: 500,
-        stream: false,
-      }),
+    const aiResponse = await callAI({
+      messages: [
+        { role: "system", content: finalSystemPrompt },
+        { role: "user", content: message },
+      ],
+      maxTokens: 500,
     });
 
-    if (!response.ok) {
-      return NextResponse.json({ code: 500, message: "AI 服务异常" }, { status: 500 });
-    }
-
-    const data = await response.json();
-    const reply = data.choices?.[0]?.message?.content || "没有收到回复";
+    const reply = aiResponse.content || "没有收到回复";
 
     // 确定要使用的 childId
     let finalChildId: string | null = null;
@@ -89,13 +75,17 @@ export async function POST(req: NextRequest) {
       finalChildId = await getUserFirstChildId(auth.userId);
     }
 
-    // 保存记录到数据库
+    // 保存记录
     if (finalChildId) {
       try {
-        await query(
-          `INSERT INTO records (child_id, content, reply, intent) VALUES ($1, $2, $3, $4)`,
-          [finalChildId, message, reply, intent]
-        );
+        await prisma.record.create({
+          data: {
+            childId: finalChildId,
+            content: message,
+            reply,
+            intent: intent as "daily" | "emergency" | "nourishment",
+          },
+        });
       } catch (dbErr) {
         logger.error("Failed to save record:", { error: String(dbErr) });
       }

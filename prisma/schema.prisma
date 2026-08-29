@@ -1,0 +1,302 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ========== 枚举定义 ==========
+
+enum Gender {
+  boy
+  girl
+}
+
+enum Intent {
+  daily
+  emergency
+  nourishment
+}
+
+enum Source {
+  manual
+  extracted
+  accompany
+  venting
+}
+
+enum EventType {
+  strength
+  challenge
+  milestone
+  interaction
+  growth
+}
+
+enum ModifiedBy {
+  ai
+  parent
+}
+
+enum ProfileEventSource {
+  manual
+  accompany
+  venting
+}
+
+// ========== 用户与认证 ==========
+
+model User {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  phone      String?   @unique @db.VarChar(20)
+  nickname   String    @default("用户") @db.VarChar(50)
+  avatarUrl  String?   @map("avatar_url") @db.VarChar(255)
+  password   String?   @db.VarChar(255)
+  parentRole String?   @map("parent_role") @db.VarChar(20)
+  lastLoginAt DateTime? @map("last_login_at") @db.Timestamp
+  lastLoginIp String?   @map("last_login_ip") @db.VarChar(50)
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamp
+  updatedAt  DateTime  @updatedAt @map("updated_at") @db.Timestamp
+
+  children   Child[]
+
+  @@map("users")
+}
+
+model AuthSession {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  phone     String   @db.VarChar(20)
+  code      String   @db.VarChar(10)
+  expiresAt DateTime @map("expires_at") @db.Timestamp
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamp
+
+  @@index([phone])
+  @@map("auth_sessions")
+}
+
+// ========== 孩子档案 ==========
+
+model Child {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  name      String   @db.VarChar(100)
+  birthDate DateTime @map("birth_date") @db.Date
+  gender    String?  @db.VarChar(10)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamp
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamp
+
+  user               User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  records            Record[]
+  questions          Question[]
+  nourishmentMoments NourishmentMoment[]
+  nourishmentReports NourishmentReport[]
+  childProfile       ChildProfile?
+  profileEvents      ProfileEvent[]
+  profileVersions    ProfileVersion[]
+  dailyCareRecords   DailyCareRecord[]
+  profileOpportunities ProfileOpportunity[]
+
+  @@index([userId])
+  @@map("children")
+}
+
+// ========== 陪伴记录 ==========
+
+model Record {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  childId   String   @map("child_id") @db.Uuid
+  content   String   @db.Text
+  reply     String?  @db.Text
+  intent    Intent   @default(daily)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamp
+
+  child               Child                 @relation(fields: [childId], references: [id], onDelete: Cascade)
+  extractedFromRecord NourishmentMoment[]   @relation("extracted_from_record")
+
+  @@index([childId])
+  @@index([createdAt(sort: Desc)])
+  @@map("records")
+}
+
+// ========== 问答记录 ==========
+
+model Question {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  childId   String   @map("child_id") @db.Uuid
+  content   String   @db.Text
+  answer    String?  @db.Text
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamp
+
+  child Child @relation(fields: [childId], references: [id], onDelete: Cascade)
+
+  @@index([childId])
+  @@map("questions")
+}
+
+// ========== 滋养时刻 ==========
+
+model NourishmentMoment {
+  id                     String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  childId                String   @map("child_id") @db.Uuid
+  fact                   String   @db.Text
+  feeling                String?  @db.Text
+  source                 Source   @default(manual)
+  extractedFromRecordId  String?  @map("extracted_from_record_id") @db.Uuid
+  createdAt              DateTime @default(now()) @map("created_at") @db.Timestamp
+
+  child         Child   @relation(fields: [childId], references: [id], onDelete: Cascade)
+  extractedFrom Record? @relation("extracted_from_record", fields: [extractedFromRecordId], references: [id], onDelete: SetNull)
+
+  @@index([childId])
+  @@index([createdAt(sort: Desc)])
+  @@map("nourishment_moments")
+}
+
+// ========== 滋养报告 ==========
+
+model NourishmentReport {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  childId     String   @map("child_id") @db.Uuid
+  periodType  String   @map("period_type") @db.VarChar(20)
+  periodStart DateTime @map("period_start") @db.Date
+  periodEnd   DateTime @map("period_end") @db.Date
+  content     Json?
+  momentCount Int      @default(0) @map("moment_count")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamp
+
+  child Child @relation(fields: [childId], references: [id], onDelete: Cascade)
+
+  @@unique([childId, periodType])
+  @@index([childId])
+  @@index([periodType])
+  @@map("nourishment_reports")
+}
+
+// ========== 孩子画像 ==========
+
+model ChildProfile {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  childId      String   @unique @map("child_id") @db.Uuid
+  personality  Json?
+  interests    Json?
+  strengths    Json?
+  challenges   Json?
+  coreNeeds    Json?    @map("core_needs")
+  growthGoals  Json?    @map("growth_goals")
+  aiAnalysis   Json?    @map("ai_analysis")
+  parentWeight Float    @default(0.5) @map("parent_weight")
+  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamp
+
+  child Child @relation(fields: [childId], references: [id], onDelete: Cascade)
+
+  @@index([childId])
+  @@map("child_profiles")
+}
+
+// ========== 画像事件库 ==========
+
+model ProfileEvent {
+  id            String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  childId       String              @map("child_id") @db.Uuid
+  eventType     EventType?          @map("event_type")
+  fact          String              @db.Text
+  interpretation String?            @db.Text
+  source        ProfileEventSource?
+  createdAt     DateTime            @default(now()) @map("created_at") @db.Timestamp
+
+  child Child @relation(fields: [childId], references: [id], onDelete: Cascade)
+
+  @@index([childId])
+  @@index([eventType])
+  @@map("profile_events")
+}
+
+// ========== 画像版本历史 ==========
+
+model ProfileVersion {
+  id               String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  childId          String     @map("child_id") @db.Uuid
+  version          Int
+  snapshot         Json
+  modifiedBy       ModifiedBy? @map("modified_by")
+  modifications    Json?
+  aiAnalysisAtTime Json?      @map("ai_analysis_at_time")
+  reviewFlags      Json?      @map("review_flags")
+  createdAt        DateTime   @default(now()) @map("created_at") @db.Timestamp
+
+  child Child @relation(fields: [childId], references: [id], onDelete: Cascade)
+
+  @@index([childId])
+  @@map("profile_versions")
+}
+
+// ========== 每日陪伴记录（AI 分析结果） ==========
+
+model DailyCareRecord {
+  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  childId          String    @map("child_id") @db.Uuid
+  content          String    @db.Text
+  reply            String?   @db.Text
+  strengths        Json?
+  opportunityAxis1 Json?     @map("opportunity_axis1")
+  opportunityAxis2 Json?     @map("opportunity_axis2")
+  advice           String?   @db.Text
+  growthSummary    String?   @map("growth_summary") @db.Text
+  intent           Intent    @default(daily)
+  touchPoint       String?   @map("touch_point") @db.VarChar(50)
+  thinkingShift    String?   @map("thinking_shift") @db.VarChar(50)
+  plannedAction    String?   @map("planned_action") @db.Text
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamp
+
+  child Child @relation(fields: [childId], references: [id], onDelete: Cascade)
+
+  @@index([childId])
+  @@map("daily_care_record")
+}
+
+// ========== 机会窗口 ==========
+
+model ProfileOpportunity {
+  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  childId         String    @map("child_id") @db.Uuid
+  dimension        String?   @db.VarChar(50)
+  element          String?   @db.VarChar(50)
+  description      String    @db.Text
+  suggestion       String?   @db.Text
+  status           String    @default("open") @db.VarChar(20)
+  firstAppearedAt  DateTime? @map("first_appeared_at") @db.Timestamp
+  lastAppearedAt   DateTime? @map("last_appeared_at") @db.Timestamp
+  appearanceCount  Int       @default(1) @map("appearance_count")
+  warningLevel     Int       @default(0) @map("warning_level")
+  sourceRecordId   String?   @map("source_record_id") @db.Uuid
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamp
+  updatedAt        DateTime  @updatedAt @map("updated_at") @db.Timestamp
+
+  child Child @relation(fields: [childId], references: [id], onDelete: Cascade)
+
+  @@index([childId])
+  @@index([status])
+  @@index([warningLevel])
+  @@map("profile_opportunities")
+}
+
+// ========== 家长反思 ==========
+
+model ParentReflection {
+  id                    String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId               String    @map("user_id") @db.Uuid
+  childId              String?   @map("child_id") @db.Uuid
+  content              String    @db.Text
+  relatedRecordId      String?   @map("related_record_id") @db.Uuid
+  relatedOpportunityId String?   @map("related_opportunity_id") @db.Uuid
+  createdAt           DateTime  @default(now()) @map("created_at") @db.Timestamp
+
+  @@index([userId])
+  @@map("parent_reflections")
+}

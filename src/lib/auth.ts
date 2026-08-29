@@ -1,4 +1,6 @@
 import jwt from 'jsonwebtoken';
+import bcrypt from 'bcryptjs';
+import { randomBytes } from 'crypto';
 
 const JWT_SECRET = process.env.JWT_SECRET!;
 if (!JWT_SECRET) {
@@ -31,12 +33,10 @@ export function getTokenFromHeader(authHeader: string | null): string | null {
 }
 
 export function hashPassword(password: string): string {
-  const bcrypt = require('bcryptjs');
   return bcrypt.hashSync(password, 10);
 }
 
 export function verifyPassword(password: string, hash: string): boolean {
-  const bcrypt = require('bcryptjs');
   return bcrypt.compareSync(password, hash);
 }
 

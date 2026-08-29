@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { query } from "@/lib/db";
+import { prisma } from "@/lib/prisma";
 import { getAuthFromRequest } from "@/lib/auth-utils";
 import { logger } from "@/lib/logger";
 
@@ -10,62 +10,62 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ code: 401, message: "未登录" }, { status: 401 });
   }
 
-  const userId = auth.userId;
-
   const { searchParams } = req.nextUrl;
   const page = parseInt(searchParams.get("page") || "0");
   const limit = parseInt(searchParams.get("limit") || "20");
-  const offset = page * limit;
+  const skip = page * limit;
 
   try {
-    let records;
-    let total;
-
-    if (userId) {
-      // 获取用户的孩子的记录
-      records = await query(
-        `SELECT r.id, r.content, r.reply, r.created_at
-         FROM records r
-         JOIN children c ON r.child_id = c.id
-         WHERE c.user_id = $1 AND r.intent = 'daily'
-         ORDER BY r.created_at DESC
-         LIMIT $2 OFFSET $3`,
-        [userId, limit, offset]
-      );
-
-      total = await query(
-        `SELECT COUNT(*) as count
-         FROM records r
-         JOIN children c ON r.child_id = c.id
-         WHERE c.user_id = $1 AND r.intent = 'daily'`,
-        [userId]
-      );
-    } else {
-      return NextResponse.json({ code: 400, message: "请先登录" }, { status: 400 });
-    }
-
-    return NextResponse.json({ code: 0, message: "成功", data: {
-      records: records.map((r: any) => {
-        let report = null;
-        if (r.reply) {
-          try {
-            report = JSON.parse(r.reply);
-          } catch (e) {
-            report = { growth_summary: r.reply };
-          }
-        }
-        return {
-          id: r.id,
-          content: r.content,
-          reply: r.reply,
-          createdAt: r.created_at,
-          report,
-        };
+    const [records, total] = await prisma.$transaction([
+      prisma.record.findMany({
+        where: {
+          intent: "daily",
+          child: { userId: auth.userId },
+        },
+        select: {
+          id: true,
+          content: true,
+          reply: true,
+          createdAt: true,
+        },
+        orderBy: { createdAt: "desc" },
+        skip,
+        take: limit,
       }),
-      total: parseInt(total[0]?.count || "0"),
-      page,
-      limit,
-    }});
+      prisma.record.count({
+        where: {
+          intent: "daily",
+          child: { userId: auth.userId },
+        },
+      }),
+    ]);
+
+    return NextResponse.json({
+      code: 0,
+      message: "成功",
+      data: {
+        records: records.map((r) => {
+          let report = null;
+          if (r.reply) {
+            try {
+              report = typeof r.reply === "string" ? JSON.parse(r.reply) : r.reply;
+            } catch {
+              report = { growth_summary: r.reply };
+            }
+          }
+          return {
+            id: r.id,
+            content: r.content,
+            reply: r.reply,
+            createdAt: r.createdAt,
+            report,
+          };
+        }),
+        total,
+        page,
+        limit,
+      },
+    });
   } catch (err) {
     logger.error("DB error:", { error: String(err) });
     return NextResponse.json({ code: 500, message: "服务器错误" }, { status: 500 });

@@ -1,22 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
-import { query } from "@/lib/db";
+import { prisma } from "@/lib/prisma";
 import { getAuthFromRequest } from "@/lib/auth-utils";
 import { logger } from "@/lib/logger";
 
 async function getUserFirstChildId(userId: string): Promise<string | null> {
-  const child = await query<{ id: string }>(
-    `SELECT id FROM children WHERE user_id = $1 ORDER BY created_at ASC LIMIT 1`,
-    [userId]
-  );
-  return child[0]?.id || null;
+  const child = await prisma.child.findFirst({
+    where: { userId },
+    orderBy: { createdAt: "asc" },
+    select: { id: true },
+  });
+  return child?.id ?? null;
 }
 
 async function validateChildId(userId: string, childId: string): Promise<boolean> {
-  const child = await query<{ id: string }>(
-    `SELECT id FROM children WHERE id = $1 AND user_id = $2`,
-    [childId, userId]
-  );
-  return child.length > 0;
+  const child = await prisma.child.findFirst({
+    where: { id: childId, userId },
+    select: { id: true },
+  });
+  return !!child;
 }
 
 // 获取版本历史
@@ -43,28 +44,25 @@ export async function GET(req: NextRequest) {
   const offset = parseInt(req.nextUrl.searchParams.get("offset") || "0");
 
   try {
-    const versions = await query(
-      `SELECT id, child_id, version, snapshot, modified_by, modifications, ai_analysis_at_time, review_flags, created_at
-       FROM profile_versions
-       WHERE child_id = $1
-       ORDER BY version DESC
-       LIMIT $2 OFFSET $3`,
-      [childId, limit, offset]
-    );
+    const versions = await prisma.profileVersion.findMany({
+      where: { childId },
+      select: {
+        id: true,
+        childId: true,
+        version: true,
+        snapshot: true,
+        modifiedBy: true,
+        modifications: true,
+        aiAnalysisAtTime: true,
+        reviewFlags: true,
+        createdAt: true,
+      },
+      orderBy: { version: "desc" },
+      skip: offset,
+      take: limit,
+    });
 
-    return NextResponse.json({ code: 0, message: "成功", data: {
-      versions: versions.map(v => ({
-        id: v.id,
-        childId: v.child_id,
-        version: v.version,
-        snapshot: v.snapshot,
-        modifiedBy: v.modified_by,
-        modifications: v.modifications,
-        aiAnalysisAtTime: v.ai_analysis_at_time,
-        reviewFlags: v.review_flags,
-        createdAt: v.created_at,
-      }))
-    }});
+    return NextResponse.json({ code: 0, message: "成功", data: { versions } });
   } catch (err) {
     logger.error("DB error:", { error: String(err) });
     return NextResponse.json({ code: 500, message: "服务器错误" }, { status: 500 });

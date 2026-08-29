@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { query, queryOne } from "@/lib/db";
+import { prisma } from "@/lib/prisma";
 import { getAuthFromRequest } from "@/lib/auth-utils";
+import { callAI, parseAIResponse } from "@/lib/ai";
 import { logger } from "@/lib/logger";
 
 const SYSTEM_PROMPT = `你是「内在结构养育」陪伴顾问。分析多天记录，给出综合解读。
@@ -38,18 +39,19 @@ const SYSTEM_PROMPT = `你是「内在结构养育」陪伴顾问。分析多天
 禁止说教。禁止空洞的"你做得很好"。`;
 
 async function getUserFirstChildId(userId: string): Promise<string | null> {
-  const child = await queryOne<{ id: string }>(
-    `SELECT id FROM children WHERE user_id = $1 ORDER BY created_at ASC LIMIT 1`,
-    [userId]
-  );
-  return child?.id || null;
+  const child = await prisma.child.findFirst({
+    where: { userId },
+    orderBy: { createdAt: "asc" },
+    select: { id: true },
+  });
+  return child?.id ?? null;
 }
 
 async function validateChildId(userId: string, childId: string): Promise<boolean> {
-  const child = await queryOne<{ id: string }>(
-    `SELECT id FROM children WHERE id = $1 AND user_id = $2`,
-    [childId, userId]
-  );
+  const child = await prisma.child.findFirst({
+    where: { id: childId, userId },
+    select: { id: true },
+  });
   return !!child;
 }
 
@@ -69,32 +71,28 @@ export async function POST(req: NextRequest) {
 
     let childId = requestedChildId;
 
-    // 如果没有提供 childId，尝试获取用户的第一个孩子
     if (!childId) {
       childId = await getUserFirstChildId(auth.userId);
       if (!childId) {
         return NextResponse.json({ code: 400, message: "请先添加孩子" }, { status: 400 });
       }
     } else {
-      // 验证 childId 属于该用户
       const isValid = await validateChildId(auth.userId, childId);
       if (!isValid) {
         return NextResponse.json({ code: 403, message: "无权访问该孩子的数据" }, { status: 403 });
       }
     }
 
-    const deepseekApi = process.env.DEEPSEEK_API_KEY;
-    if (!deepseekApi) {
-      return NextResponse.json({ code: 500, message: "服务未配置" }, { status: 500 });
-    }
-
-    // 保存每条记录
+    // 批量插入记录
     for (const content of records) {
       try {
-        await query(
-          `INSERT INTO records (child_id, content, intent, created_at) VALUES ($1, $2, 'daily', NOW())`,
-          [childId, content]
-        );
+        await prisma.record.create({
+          data: {
+            childId,
+            content,
+            intent: "daily",
+          },
+        });
       } catch (err) {
         logger.error("Failed to save record:", { error: String(err) });
       }
@@ -105,42 +103,21 @@ export async function POST(req: NextRequest) {
       `[记录${i + 1}]: ${r}`
     ).join('\n\n');
 
-    // 调用 AI 分析
-    const response = await fetch("https://api.deepseek.com/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${deepseekApi}`,
-      },
-      body: JSON.stringify({
-        model: "deepseek-chat",
-        messages: [
-          { role: "system", content: SYSTEM_PROMPT },
-          { role: "user", content: `以下是家长的初始回忆记录：\n\n${recordSummaries}\n\n请给出综合分析。` },
-        ],
-        max_tokens: 1500,
-        stream: false,
-      }),
+    // 调用 AI 分析（使用 jsonMode）
+    const aiResponse = await callAI({
+      messages: [
+        { role: "system", content: SYSTEM_PROMPT },
+        { role: "user", content: `以下是家长的初始回忆记录：\n\n${recordSummaries}\n\n请给出综合分析。` },
+      ],
+      maxTokens: 1500,
+      jsonMode: true,
     });
 
-    if (!response.ok) {
-      return NextResponse.json({ code: 500, message: "AI 服务异常" }, { status: 500 });
-    }
-
-    const data = await response.json();
-    const aiContent = data.choices?.[0]?.message?.content || "";
-
-    // 解析 AI 返回的 JSON
     let report;
     try {
-      const jsonMatch = aiContent.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        report = JSON.parse(jsonMatch[0]);
-      } else {
-        report = { growth_summary: aiContent.substring(0, 200) };
-      }
-    } catch (parseErr) {
-      report = { growth_summary: aiContent.substring(0, 200) };
+      report = parseAIResponse(aiResponse.content);
+    } catch {
+      report = { growth_summary: aiResponse.content.substring(0, 200) };
     }
 
     return NextResponse.json({ code: 0, message: "成功", data: report });

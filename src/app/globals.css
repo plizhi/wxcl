@@ -14,13 +14,6 @@ body {
   color: var(--color-text);
 }
 
-/* Placeholder 样式 - 确保在各平台可见 */
-input::placeholder,
-textarea::placeholder {
-  color: #9ca3af;
-  opacity: 1;
-}
-
 .pb-safe {
   padding-bottom: env(safe-area-inset-bottom, 0);
 }

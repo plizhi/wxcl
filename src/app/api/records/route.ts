@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { query, queryOne } from "@/lib/db";
+import { prisma } from "@/lib/prisma";
 import { getTokenFromHeader, verifyToken } from "@/lib/auth";
-import { logger } from "@/lib/logger";
 
 // GET /api/records?childId=xxx - 获取孩子的陪伴记录
 export async function GET(req: NextRequest) {
@@ -20,27 +19,32 @@ export async function GET(req: NextRequest) {
   }
 
   // 验证 childId 属于当前用户
-  const child = await queryOne(
-    `SELECT id FROM children WHERE id = $1 AND user_id = $2`,
-    [childId, auth.userId]
-  );
+  const child = await prisma.child.findFirst({
+    where: { id: childId, userId: auth.userId },
+    select: { id: true },
+  });
 
   if (!child) {
     return NextResponse.json({ code: 403, message: "无权访问" }, { status: 403 });
   }
 
   try {
-    const records = await query(
-      `SELECT id, content, reply, intent, created_at
-       FROM records
-       WHERE child_id = $1
-       ORDER BY created_at DESC
-       LIMIT 50`,
-      [childId]
-    );
+    const records = await prisma.record.findMany({
+      where: { childId },
+      select: {
+        id: true,
+        content: true,
+        reply: true,
+        intent: true,
+        createdAt: true,
+      },
+      orderBy: { createdAt: "desc" },
+      take: 50,
+    });
+
     return NextResponse.json({ code: 0, message: "成功", data: { records } });
   } catch (err) {
-    logger.error("DB error:", { error: String(err) });
+    console.error("DB error:", err);
     return NextResponse.json({ code: 500, message: "服务器错误" }, { status: 500 });
   }
 }
@@ -63,25 +67,23 @@ export async function POST(req: NextRequest) {
     }
 
     // 验证 childId 属于当前用户
-    const child = await queryOne(
-      `SELECT id FROM children WHERE id = $1 AND user_id = $2`,
-      [childId, auth.userId]
-    );
+    const child = await prisma.child.findFirst({
+      where: { id: childId, userId: auth.userId },
+      select: { id: true },
+    });
 
     if (!child) {
       return NextResponse.json({ code: 403, message: "无权访问" }, { status: 403 });
     }
 
-    const record = await queryOne(
-      `INSERT INTO records (child_id, content, reply, intent)
-       VALUES ($1, $2, $3, $4)
-       RETURNING id, created_at`,
-      [childId, content, reply, intent]
-    );
+    const record = await prisma.record.create({
+      data: { childId, content, reply, intent },
+      select: { id: true, createdAt: true },
+    });
 
     return NextResponse.json({ code: 0, message: "成功", data: { record } });
   } catch (err) {
-    logger.error("DB error:", { error: String(err) });
+    console.error("DB error:", err);
     return NextResponse.json({ code: 500, message: "服务器错误" }, { status: 500 });
   }
 }

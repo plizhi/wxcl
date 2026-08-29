@@ -1,5 +1,5 @@
-import { query } from './db';
-import { profileApi } from './api';
+import { prisma } from "./prisma";
+import { callAI, parseAIResponse } from "./ai";
 
 const EXTRACT_PROMPT = `你是「内在结构养育」分析师。请从以下记录中提取关键事件。
 
@@ -24,96 +24,70 @@ const EXTRACT_PROMPT = `你是「内在结构养育」分析师。请从以下�
 只返回 JSON，不要有其他内容。记录如下：`;
 
 export interface ExtractedEvent {
-  eventType: 'strength' | 'challenge' | 'milestone' | 'interaction' | 'growth';
+  eventType: "strength" | "challenge" | "milestone" | "interaction" | "growth";
   fact: string;
   interpretation?: string;
 }
 
 export async function extractEventsFromRecord(
   content: string,
-  childId: string
+  _childId: string
 ): Promise<ExtractedEvent[]> {
-  const deepseekApi = process.env.DEEPSEEK_API_KEY;
-  if (!deepseekApi) {
-    console.error('DeepSeek API not configured');
-    return [];
-  }
-
   try {
-    const response = await fetch("https://api.deepseek.com/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${deepseekApi}`,
-      },
-      body: JSON.stringify({
-        model: "deepseek-chat",
-        messages: [
-          { role: "system", content: EXTRACT_PROMPT },
-          { role: "user", content: content },
-        ],
-        max_tokens: 1000,
-        stream: false,
-      }),
+    const aiResponse = await callAI({
+      messages: [
+        { role: "system", content: EXTRACT_PROMPT },
+        { role: "user", content: content },
+      ],
+      maxTokens: 1000,
+      jsonMode: true,
     });
 
-    if (!response.ok) {
-      console.error('DeepSeek API error:', await response.text());
-      return [];
-    }
-
-    const data = await response.json();
-    const aiContent = data.choices?.[0]?.message?.content || "";
-
-    // 解析 JSON
-    const jsonMatch = aiContent.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) return [];
-
-    const result = JSON.parse(jsonMatch[0]);
-    return result.events || [];
+    const result = parseAIResponse<{ events?: ExtractedEvent[] }>(aiResponse.content);
+    return result?.events || [];
   } catch (err) {
-    console.error('Failed to extract events:', err);
+    console.error("Failed to extract events:", err);
     return [];
   }
 }
 
-// 从陪伴记录中提取事件并保存
 export async function extractAndSaveEventsFromRecords(
   childId: string,
   limit: number = 10
 ): Promise<number> {
   try {
-    // 获取最近的陪伴记录
-    const records = await query(
-      `SELECT id, content FROM records
-       WHERE child_id = $1 AND intent = 'daily'
-       ORDER BY created_at DESC LIMIT $2`,
-      [childId, limit]
-    );
+    const records = await prisma.record.findMany({
+      where: { childId, intent: "daily" },
+      select: { id: true, content: true },
+      orderBy: { createdAt: "desc" },
+      take: limit,
+    });
 
     let savedCount = 0;
 
     for (const record of records) {
-      // 检查是否已提取过
-      const existing = await query(
-        `SELECT id FROM profile_events
-         WHERE child_id = $1 AND source = 'accompany' AND fact = $2`,
-        [childId, record.content.substring(0, 200)]
-      );
+      const existing = await prisma.profileEvent.findFirst({
+        where: {
+          childId,
+          source: "accompany",
+          fact: record.content.substring(0, 200),
+        },
+        select: { id: true },
+      });
 
-      if (existing.length > 0) continue;
+      if (existing) continue;
 
-      // 提取事件
       const events = await extractEventsFromRecord(record.content, childId);
 
-      // 保存事件
       for (const event of events) {
-        await profileApi.addEvent({
-          childId,
-          eventType: event.eventType,
-          fact: event.fact,
-          interpretation: event.interpretation,
-          source: 'accompany',
+        await prisma.profileEvent.create({
+          data: {
+            childId,
+            eventType: event.eventType,
+            fact: event.fact,
+            interpretation: event.interpretation,
+            source: "accompany",
+          },
         });
         savedCount++;
       }
@@ -121,48 +95,48 @@ export async function extractAndSaveEventsFromRecords(
 
     return savedCount;
   } catch (err) {
-    console.error('Failed to extract and save events:', err);
+    console.error("Failed to extract and save events:", err);
     return 0;
   }
 }
 
-// 从压力吐槽中提取事件
 export async function extractAndSaveEventsFromQuestions(
   childId: string,
   limit: number = 10
 ): Promise<number> {
   try {
-    // 获取最近的压力吐槽
-    const questions = await query(
-      `SELECT id, content FROM questions
-       WHERE child_id = $1
-       ORDER BY created_at DESC LIMIT $2`,
-      [childId, limit]
-    );
+    const questions = await prisma.question.findMany({
+      where: { childId },
+      select: { id: true, content: true },
+      orderBy: { createdAt: "desc" },
+      take: limit,
+    });
 
     let savedCount = 0;
 
     for (const q of questions) {
-      // 检查是否已提取过
-      const existing = await query(
-        `SELECT id FROM profile_events
-         WHERE child_id = $1 AND source = 'venting' AND fact = $2`,
-        [childId, q.content.substring(0, 200)]
-      );
+      const existing = await prisma.profileEvent.findFirst({
+        where: {
+          childId,
+          source: "venting",
+          fact: q.content.substring(0, 200),
+        },
+        select: { id: true },
+      });
 
-      if (existing.length > 0) continue;
+      if (existing) continue;
 
-      // 提取事件
       const events = await extractEventsFromRecord(q.content, childId);
 
-      // 保存事件
       for (const event of events) {
-        await profileApi.addEvent({
-          childId,
-          eventType: event.eventType,
-          fact: event.fact,
-          interpretation: event.interpretation,
-          source: 'venting',
+        await prisma.profileEvent.create({
+          data: {
+            childId,
+            eventType: event.eventType,
+            fact: event.fact,
+            interpretation: event.interpretation,
+            source: "venting",
+          },
         });
         savedCount++;
       }
@@ -170,35 +144,33 @@ export async function extractAndSaveEventsFromQuestions(
 
     return savedCount;
   } catch (err) {
-    console.error('Failed to extract events from questions:', err);
+    console.error("Failed to extract events from questions:", err);
     return 0;
   }
 }
 
-// AI 分析画像
-export async function analyzeProfile(
-  childId: string
-): Promise<any> {
-  const deepseekApi = process.env.DEEPSEEK_API_KEY;
-  if (!deepseekApi) {
-    console.error('DeepSeek API not configured');
-    return null;
-  }
+interface AnalyzeProfileResult {
+  personality: { type: string; details: string[] };
+  strengths: string[];
+  challenges: string[];
+  coreNeeds: string[];
+  growthGoals: { enhancements: string[]; supports: string[] };
+}
 
+export async function analyzeProfile(childId: string): Promise<AnalyzeProfileResult | null> {
   try {
-    // 获取事件
-    const events = await query(
-      `SELECT event_type, fact, interpretation FROM profile_events
-       WHERE child_id = $1
-       ORDER BY created_at DESC LIMIT 50`,
-      [childId]
-    );
+    const events = await prisma.profileEvent.findMany({
+      where: { childId },
+      select: { eventType: true, fact: true, interpretation: true },
+      orderBy: { createdAt: "desc" },
+      take: 50,
+    });
 
     if (events.length === 0) return null;
 
-    const eventsText = events.map(e =>
-      `[${e.event_type}] ${e.fact}${e.interpretation ? ' - ' + e.interpretation : ''}`
-    ).join('\n');
+    const eventsText = events
+      .map((e) => `[${e.eventType}] ${e.fact}${e.interpretation ? " - " + e.interpretation : ""}`)
+      .join("\n");
 
     const analyzePrompt = `你是「内在结构养育」分析师。基于以下事件记录，分析孩子的画像：
 
@@ -222,37 +194,18 @@ ${eventsText}
 
 只返回 JSON。`;
 
-    const response = await fetch("https://api.deepseek.com/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${deepseekApi}`,
-      },
-      body: JSON.stringify({
-        model: "deepseek-chat",
-        messages: [
-          { role: "system", content: analyzePrompt },
-          { role: "user", content: "请分析孩子的画像" },
-        ],
-        max_tokens: 1500,
-        stream: false,
-      }),
+    const aiResponse = await callAI({
+      messages: [
+        { role: "system", content: analyzePrompt },
+        { role: "user", content: "请分析孩子的画像" },
+      ],
+      maxTokens: 1500,
+      jsonMode: true,
     });
 
-    if (!response.ok) {
-      console.error('DeepSeek API error:', await response.text());
-      return null;
-    }
-
-    const data = await response.json();
-    const aiContent = data.choices?.[0]?.message?.content || "";
-
-    const jsonMatch = aiContent.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) return null;
-
-    return JSON.parse(jsonMatch[0]);
+    return parseAIResponse<AnalyzeProfileResult>(aiResponse.content);
   } catch (err) {
-    console.error('Failed to analyze profile:', err);
+    console.error("Failed to analyze profile:", err);
     return null;
   }
 }

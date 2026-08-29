@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { query } from "@/lib/db";
+import { prisma } from "@/lib/prisma";
 import { getAuthFromRequest } from "@/lib/auth-utils";
+import { callAI, parseAIResponse } from "@/lib/ai";
 import { logger } from "@/lib/logger";
 
 const SYSTEM_PROMPTS = {
@@ -63,88 +64,59 @@ export async function GET(req: NextRequest) {
   const userId = auth.userId;
 
   try {
-    let records;
-
-    if (userId) {
-      let sql = `
-        SELECT r.id, r.content, r.reply, r.created_at
-        FROM records r
-        JOIN children c ON r.child_id = c.id
-        WHERE c.user_id = $1 AND r.intent = 'daily'
-      `;
-      const params: any[] = [userId];
-
-      if (startDate) {
-        sql += ` AND DATE(r.created_at) >= $${params.length + 1}`;
-        params.push(startDate);
-      }
-      if (endDate) {
-        sql += ` AND DATE(r.created_at) <= $${params.length + 1}`;
-        params.push(endDate);
-      }
-
-      sql += ` ORDER BY r.created_at DESC LIMIT 50`;
-
-      records = await query(sql, params);
-    } else {
-      return NextResponse.json({ code: 400, message: "请先登录" }, { status: 400 });
-    }
+    const records = await prisma.record.findMany({
+      where: {
+        intent: "daily",
+        child: { userId },
+        ...(startDate || endDate
+          ? {
+              createdAt: {
+                ...(startDate && { gte: new Date(startDate) }),
+                ...(endDate && { lte: new Date(endDate) }),
+              },
+            }
+          : {}),
+      },
+      select: {
+        id: true,
+        content: true,
+        reply: true,
+        createdAt: true,
+      },
+      orderBy: { createdAt: "desc" },
+      take: 50,
+    });
 
     if (!records || records.length === 0) {
       return NextResponse.json({ code: 400, message: "没有找到记录" }, { status: 400 });
     }
 
     // 构建记录摘要
-    const recordSummaries = records.map((r: any, i: number) => {
-      let replyObj = null;
+    const recordSummaries = records.map((r, i) => {
+      let growthSummary: string | undefined;
       if (r.reply) {
         try {
-          replyObj = JSON.parse(r.reply);
-        } catch (e) {}
+          const parsed = typeof r.reply === "string" ? JSON.parse(r.reply) : r.reply;
+          growthSummary = parsed?.growth_summary;
+        } catch {}
       }
-      return `[记录${i + 1}](${new Date(r.created_at).toLocaleDateString('zh-CN')}): ${r.content}${replyObj?.growth_summary ? ` → 亮点: ${replyObj.growth_summary}` : ''}`;
-    }).join('\n\n');
+      return `[记录${i + 1}](${new Date(r.createdAt).toLocaleDateString("zh-CN")}): ${r.content}${growthSummary ? ` → 亮点: ${growthSummary}` : ""}`;
+    }).join("\n\n");
 
-    const deepseekApi = process.env.DEEPSEEK_API_KEY;
-    if (!deepseekApi) {
-      return NextResponse.json({ code: 500, message: "服务未配置" }, { status: 500 });
-    }
-
-    const response = await fetch("https://api.deepseek.com/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${deepseekApi}`,
-      },
-      body: JSON.stringify({
-        model: "deepseek-chat",
-        messages: [
-          { role: "system", content: SYSTEM_PROMPTS.comprehensive },
-          { role: "user", content: `以下是最近一段时间的陪伴记录，请给出综合分析：\n\n${recordSummaries}` },
-        ],
-        max_tokens: 1500,
-        stream: false,
-      }),
+    const aiResponse = await callAI({
+      messages: [
+        { role: "system", content: SYSTEM_PROMPTS.comprehensive },
+        { role: "user", content: `以下是最近一段时间的陪伴记录，请给出综合分析：\n\n${recordSummaries}` },
+      ],
+      maxTokens: 1500,
+      jsonMode: true,
     });
 
-    if (!response.ok) {
-      return NextResponse.json({ code: 500, message: "AI 服务异常" }, { status: 500 });
-    }
-
-    const data = await response.json();
-    const aiContent = data.choices?.[0]?.message?.content || "";
-
-    // 解析 AI 返回的 JSON
     let report;
     try {
-      const jsonMatch = aiContent.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        report = JSON.parse(jsonMatch[0]);
-      } else {
-        report = { growth_summary: aiContent.substring(0, 200) };
-      }
-    } catch (parseErr) {
-      report = { growth_summary: aiContent.substring(0, 200) };
+      report = parseAIResponse(aiResponse.content);
+    } catch {
+      report = { growth_summary: aiResponse.content.substring(0, 200) };
     }
 
     return NextResponse.json({ code: 0, message: "成功", data: report });

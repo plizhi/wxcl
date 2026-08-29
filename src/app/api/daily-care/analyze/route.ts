@@ -1,23 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
-import { query, queryOne } from "@/lib/db";
+import { prisma } from "@/lib/prisma";
 import { getAuthFromRequest } from "@/lib/auth-utils";
 import { callAI, parseAIResponse } from "@/lib/ai";
+import { DailyCareReport } from "@/lib/types";
 
 // 根据用户身份构建 system prompt
-// 支持多种格式：'爸爸'/'妈妈' 或 'dad'/'mom'
 function buildSystemPrompt(basePrompt: string, parentRole?: string): string {
   if (!parentRole) return basePrompt;
-
-  // 统一转换为判断
   const isMom = parentRole === '妈妈' || parentRole === 'mom';
   const isDad = parentRole === '爸爸' || parentRole === 'dad';
-
   const roleContext = isMom
     ? '你是「内在结构养育」陪伴顾问，一位理解母亲视角的专业陪伴者。'
     : isDad
     ? '你是「内在结构养育」陪伴顾问，一位理解父亲视角的专业陪伴者。'
     : '你是「内在结构养育」陪伴顾问。';
-
   return basePrompt.replace('你是「内在结构养育」陪伴顾问。', roleContext);
 }
 
@@ -129,55 +125,44 @@ const SYSTEM_PROMPTS = {
 
 // 获取用户的第一个孩子
 async function getUserFirstChildId(userId: string): Promise<string | null> {
-  try {
-    const child = await queryOne<{ id: string }>(
-      `SELECT id FROM children WHERE user_id = $1 ORDER BY created_at ASC LIMIT 1`,
-      [userId]
-    );
-    return child?.id || null;
-  } catch (err) {
-    console.error("Failed to get user first child:", err);
-    return null;
-  }
+  const child = await prisma.child.findFirst({
+    where: { userId },
+    orderBy: { createdAt: "asc" },
+    select: { id: true },
+  });
+  return child?.id ?? null;
 }
 
 // 验证 childId 是否属于用户
 async function validateChildId(userId: string, childId: string): Promise<boolean> {
-  try {
-    const child = await queryOne<{ id: string }>(
-      `SELECT id FROM children WHERE id = $1 AND user_id = $2`,
-      [childId, userId]
-    );
-    return !!child;
-  } catch (err) {
-    return false;
-  }
+  const child = await prisma.child.findFirst({
+    where: { id: childId, userId },
+    select: { id: true },
+  });
+  return !!child;
 }
 
-// 获取孩子的开放机会窗口
-// [试验性改动 2024-08-04] 限制为2个，减少上下文膨胀
+// 获取孩子的开放机会窗口（限制2个）
 async function getOpenOpportunities(childId: string) {
-  try {
-    const opportunities = await query<{
-      id: string;
-      dimension: string;
-      element: string;
-      description: string;
-      suggestion: string;
-      appearance_count: number;
-    }>(
-      `SELECT id, dimension, element, description, suggestion, appearance_count
-       FROM profile_opportunities
-       WHERE child_id = $1 AND status = 'open'
-       ORDER BY last_appeared_at DESC
-       LIMIT 2`,
-      [childId]
-    );
-    return opportunities;
-  } catch (err) {
-    console.error("Failed to get open opportunities:", err);
-    return [];
-  }
+  const opps = await prisma.profileOpportunity.findMany({
+    where: { childId, status: "open" },
+    orderBy: { lastAppearedAt: "desc" },
+    take: 2,
+    select: {
+      dimension: true,
+      element: true,
+      description: true,
+      suggestion: true,
+      appearanceCount: true,
+    },
+  });
+  // 统一 null → undefined
+  return opps.map((o) => ({
+    ...o,
+    dimension: o.dimension ?? undefined,
+    element: o.element ?? undefined,
+    suggestion: o.suggestion ?? undefined,
+  }));
 }
 
 // 保存或更新机会窗口
@@ -187,58 +172,61 @@ async function saveOpportunities(
   opportunities: Array<{ dimension?: string; description?: string; suggestion?: string } | null>
 ) {
   for (const opp of opportunities) {
-    if (!opp || !opp.dimension || !opp.description) continue;
+    if (!opp || !opp.dimension || !opp.description) {
+      continue;
+    }
 
-    try {
-      // 检查是否存在相似的开放机会窗口
-      const existing = await queryOne<{ id: string; appearance_count: number }>(
-        `SELECT id, appearance_count FROM profile_opportunities
-         WHERE child_id = $1 AND status = 'open'
-         AND dimension = $2 AND description = $3
-         ORDER BY created_at DESC LIMIT 1`,
-        [childId, opp.dimension, opp.description]
-      );
+    const existing = await prisma.profileOpportunity.findFirst({
+      where: {
+        childId,
+        status: "open",
+        dimension: opp.dimension,
+        description: opp.description,
+      },
+      orderBy: { createdAt: "desc" },
+      select: { id: true, appearanceCount: true },
+    });
 
-      if (existing) {
-        // 更新已有窗口
-        await query(
-          `UPDATE profile_opportunities
-           SET last_appeared_at = NOW(),
-               appearance_count = appearance_count + 1,
-               warning_level = CASE
-                 WHEN appearance_count + 1 >= 5 THEN 2
-                 WHEN appearance_count + 1 >= 3 THEN 1
-                 ELSE 0
-               END,
-               source_record_id = $4,
-               updated_at = NOW()
-           WHERE id = $1`,
-          [existing.id, recordId]
-        );
-      } else {
-        // 创建新窗口
-        await query(
-          `INSERT INTO profile_opportunities
-           (child_id, dimension, element, description, suggestion, source_record_id,
-            first_appeared_at, last_appeared_at, appearance_count)
-           VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW(), 1)`,
-          [childId, opp.dimension, null, opp.description, opp.suggestion || null, recordId]
-        );
-      }
-    } catch (err) {
-      console.error("Failed to save opportunity:", err);
+    if (existing) {
+      const newCount = existing.appearanceCount + 1;
+      await prisma.profileOpportunity.update({
+        where: { id: existing.id },
+        data: {
+          lastAppearedAt: new Date(),
+          appearanceCount: newCount,
+          warningLevel: newCount >= 5 ? 2 : newCount >= 3 ? 1 : 0,
+          sourceRecordId: recordId,
+        },
+      });
+    } else {
+      await prisma.profileOpportunity.create({
+        data: {
+          childId,
+          dimension: opp.dimension,
+          description: opp.description,
+          suggestion: opp.suggestion,
+          sourceRecordId: recordId,
+          firstAppearedAt: new Date(),
+          lastAppearedAt: new Date(),
+          appearanceCount: 1,
+          status: "open",
+        },
+      });
     }
   }
 }
 
 // 构建带历史上下文的 prompt
-function buildPromptWithHistory(basePrompt: string, opportunities: { dimension?: string; element?: string; description: string; suggestion?: string; appearance_count: number }[]): string {
+function buildPromptWithHistory(
+  basePrompt: string,
+  opportunities: { dimension?: string; element?: string; description: string; suggestion?: string; appearanceCount: number }[]
+): string {
   if (!opportunities || opportunities.length === 0) return basePrompt;
 
   const historySection = `\n\n【孩子发展轨迹】\n以下方向在之前记录中出现过，供分析参考：\n` +
     opportunities.map((o, i) => {
       const type = o.dimension ? `方向: ${o.dimension}` : `方向: ${o.element}`;
-      return `${i + 1}. ${type} - ${o.description} (出现 ${o.appearance_count} 次)`;
+      return `${i + 1}. ${type} - ${o.description} (出现 ${o.appearanceCount} 次)`;
     }).join('\n') +
     `\n\n请结合历史轨迹分析本次记录，关注孩子的变化和发展。`;
 
@@ -252,13 +240,12 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const { content, childId: requestedChildId, intent = 'daily', parentRole } = await req.json();
+    const { content, childId: requestedChildId, intent = "daily", parentRole } = await req.json();
 
-    if (!content || typeof content !== 'string') {
+    if (!content || typeof content !== "string") {
       return NextResponse.json({ code: 400, message: "内容不能为空" }, { status: 400 });
     }
 
-    // 限制内容长度
     const maxLength = 2000;
     if (content.length > maxLength) {
       return NextResponse.json({ code: 400, message: `内容不能超过${maxLength}字` }, { status: 400 });
@@ -266,62 +253,59 @@ export async function POST(req: NextRequest) {
 
     let childId = requestedChildId;
 
-    // 如果没有提供 childId，尝试获取用户的第一个孩子
     if (!childId) {
       childId = await getUserFirstChildId(auth.userId);
       if (!childId) {
         return NextResponse.json({ code: 400, message: "请先添加孩子" }, { status: 400 });
       }
     } else {
-      // 验证 childId 属于该用户
       const isValid = await validateChildId(auth.userId, childId);
       if (!isValid) {
         return NextResponse.json({ code: 403, message: "无权访问该孩子的数据" }, { status: 403 });
       }
     }
 
-    // 获取历史机会窗口（仅对 daily intent）
-    let historyOpportunities: { dimension?: string; element?: string; description: string; suggestion?: string; appearance_count: number }[] = [];
-    if (intent === 'daily' && childId) {
+    let historyOpportunities: { dimension?: string; element?: string; description: string; suggestion?: string; appearanceCount: number }[] = [];
+    if (intent === "daily" && childId) {
       historyOpportunities = await getOpenOpportunities(childId);
     }
 
-    // 根据 intent 选择 prompt，并加入用户身份
     const basePrompt = (SYSTEM_PROMPTS as Record<string, string>)[intent] || SYSTEM_PROMPTS.analyze;
     const systemPrompt = buildPromptWithHistory(buildSystemPrompt(basePrompt, parentRole), historyOpportunities);
 
-    // 调用 AI
     const aiResponse = await callAI({
-      messages: [{ role: 'user', content }],
+      messages: [{ role: "user", content }],
       systemPrompt,
       maxTokens: 1000,
+      jsonMode: true,
     });
 
-    // 解析 AI 返回的 JSON
-    let report = parseAIResponse(aiResponse.content);
+    const report = parseAIResponse<DailyCareReport>(aiResponse.content);
     if (!report) {
-      report = { growth_summary: aiResponse.content.substring(0, 100) };
+      throw new Error("AI 响应解析失败");
     }
 
-    // 保存记录到数据库
-    let recordId;
+    let recordId: string | undefined;
     if (childId) {
       try {
-        const result = await query(
-          `INSERT INTO records (child_id, content, reply, intent, created_at)
-           VALUES ($1, $2, $3, $4, NOW())
-           RETURNING id`,
-          [childId, content, JSON.stringify(report), intent]
-        );
-        recordId = result[0]?.id;
-
-        // 保存机会窗口（仅对 daily intent）
-        if (intent === 'daily' && recordId) {
-          await saveOpportunities(
+        const record = await prisma.record.create({
+          data: {
             childId,
-            recordId,
-            [report.opportunity_axis1, report.opportunity_axis2, report.opportunity_axis3]
-          );
+            content,
+            reply: JSON.stringify(report),
+            intent: intent as "daily" | "emergency" | "nourishment",
+          },
+          select: { id: true },
+        });
+        recordId = record.id;
+
+        if (intent === "daily" && recordId) {
+          const opportunities = [
+            report.opportunity_axis1,
+            report.opportunity_axis2,
+            report.opportunity_axis3,
+          ].filter(Boolean) as Array<{ dimension?: string; description?: string; suggestion?: string } | null>;
+          await saveOpportunities(childId, recordId, opportunities);
         }
       } catch (dbErr) {
         console.error("Failed to save record:", dbErr);
@@ -335,11 +319,10 @@ export async function POST(req: NextRequest) {
       touchPoint: "",
       thinkingShift: "",
       plannedAction: "",
-      // 返回历史机会窗口供前端展示
       historyOpportunities: historyOpportunities.length > 0 ? historyOpportunities : undefined,
     });
   } catch (err) {
-    console.error('Analyze error:', err);
+    console.error("Analyze error:", err);
     return NextResponse.json({ code: 500, message: "分析失败，请稍后重试" }, { status: 500 });
   }
 }
