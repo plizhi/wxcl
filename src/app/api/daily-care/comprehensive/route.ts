@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getAuthFromRequest } from "@/lib/auth-utils";
 import { callAI, parseAIResponse } from "@/lib/ai";
-import { logger } from "@/lib/logger";
+import { withErrorHandler, errors } from "@/lib/api-error";
 
 const SYSTEM_PROMPTS = {
   comprehensive: `你是「内在结构养育」陪伴顾问。请分析以下多天的陪伴记录，从专业框架给出综合解读。
@@ -51,77 +51,70 @@ const SYSTEM_PROMPTS = {
 禁止说教。禁止空洞的"你做得很好"。`,
 };
 
-export async function GET(req: NextRequest) {
+export const GET = withErrorHandler(async (req: NextRequest) => {
   const { searchParams } = req.nextUrl;
   const startDate = searchParams.get("startDate") || undefined;
   const endDate = searchParams.get("endDate") || undefined;
 
   const auth = getAuthFromRequest(req);
-  if (!auth) {
-    return NextResponse.json({ code: 401, message: "未登录" }, { status: 401 });
-  }
+  if (!auth) throw errors.unauthorized();
 
   const userId = auth.userId;
 
-  try {
-    const records = await prisma.record.findMany({
-      where: {
-        intent: "daily",
-        child: { userId },
-        ...(startDate || endDate
-          ? {
-              createdAt: {
-                ...(startDate && { gte: new Date(startDate) }),
-                ...(endDate && { lte: new Date(endDate) }),
-              },
-            }
-          : {}),
-      },
-      select: {
-        id: true,
-        content: true,
-        reply: true,
-        createdAt: true,
-      },
-      orderBy: { createdAt: "desc" },
-      take: 50,
-    });
+  const records = await prisma.record.findMany({
+    where: {
+      intent: "daily",
+      child: { userId },
+      ...(startDate || endDate
+        ? {
+            createdAt: {
+              ...(startDate && { gte: new Date(startDate) }),
+              ...(endDate && { lte: new Date(endDate) }),
+            },
+          }
+        : {}),
+    },
+    select: {
+      id: true,
+      content: true,
+      reply: true,
+      createdAt: true,
+    },
+    orderBy: { createdAt: "desc" },
+    take: 50,
+  });
 
-    if (!records || records.length === 0) {
-      return NextResponse.json({ code: 400, message: "没有找到记录" }, { status: 400 });
-    }
-
-    // 构建记录摘要
-    const recordSummaries = records.map((r, i) => {
-      let growthSummary: string | undefined;
-      if (r.reply) {
-        try {
-          const parsed = typeof r.reply === "string" ? JSON.parse(r.reply) : r.reply;
-          growthSummary = parsed?.growth_summary;
-        } catch {}
-      }
-      return `[记录${i + 1}](${new Date(r.createdAt).toLocaleDateString("zh-CN")}): ${r.content}${growthSummary ? ` → 亮点: ${growthSummary}` : ""}`;
-    }).join("\n\n");
-
-    const aiResponse = await callAI({
-      messages: [
-        { role: "system", content: SYSTEM_PROMPTS.comprehensive },
-        { role: "user", content: `以下是最近一段时间的陪伴记录，请给出综合分析：\n\n${recordSummaries}` },
-      ],
-      maxTokens: 1500,
-      jsonMode: true,
-    });
-
-    let report;
-    try {
-      report = parseAIResponse(aiResponse.content);
-    } catch {
-      report = { growth_summary: aiResponse.content.substring(0, 200) };
-    }
-
-    return NextResponse.json({ code: 0, message: "成功", data: report });
-  } catch (err) {
-    logger.error("Comprehensive report error:", { error: String(err) });
-    return NextResponse.json({ code: 500, message: "服务器错误" }, { status: 500 });
+  if (!records || records.length === 0) {
+    throw errors.badRequest("没有找到记录");
   }
-}
+
+  // 构建记录摘要
+  const recordSummaries = records.map((r, i) => {
+    let growthSummary: string | undefined;
+    if (r.reply) {
+      try {
+        const parsed = typeof r.reply === "string" ? JSON.parse(r.reply) : r.reply;
+        growthSummary = parsed?.growth_summary;
+      } catch {}
+    }
+    return `[记录${i + 1}](${new Date(r.createdAt).toLocaleDateString("zh-CN")}): ${r.content}${growthSummary ? ` → 亮点: ${growthSummary}` : ""}`;
+  }).join("\n\n");
+
+  const aiResponse = await callAI({
+    messages: [
+      { role: "system", content: SYSTEM_PROMPTS.comprehensive },
+      { role: "user", content: `以下是最近一段时间的陪伴记录，请给出综合分析：\n\n${recordSummaries}` },
+    ],
+    maxTokens: 1500,
+    jsonMode: true,
+  });
+
+  let report;
+  try {
+    report = parseAIResponse(aiResponse.content);
+  } catch {
+    report = { growth_summary: aiResponse.content.substring(0, 200) };
+  }
+
+  return NextResponse.json({ code: 0, message: "成功", data: report });
+});

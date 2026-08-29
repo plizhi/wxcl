@@ -1,144 +1,125 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getAuthFromRequest } from "@/lib/auth-utils";
+import { withErrorHandler, errors } from "@/lib/api-error";
 
 // GET /api/children - 获取用户的孩子列表
-export async function GET(req: NextRequest) {
+export const GET = withErrorHandler(async (req: NextRequest) => {
   const auth = getAuthFromRequest(req);
   if (!auth) {
-    return NextResponse.json({ code: 401, message: "未登录" }, { status: 401 });
+    throw errors.unauthorized();
   }
 
-  try {
-    const children = await prisma.child.findMany({
-      where: { userId: auth.userId },
-      select: {
-        id: true,
-        name: true,
-        gender: true,
-        birthDate: true,
-        createdAt: true,
-      },
-      orderBy: { createdAt: "desc" },
-    });
-    return NextResponse.json({ code: 0, data: children });
-  } catch (err) {
-    console.error("DB error:", err);
-    return NextResponse.json({ code: 500, message: "服务器错误" }, { status: 500 });
-  }
-}
+  const children = await prisma.child.findMany({
+    where: { userId: auth.userId },
+    select: {
+      id: true,
+      name: true,
+      gender: true,
+      birthDate: true,
+      createdAt: true,
+    },
+    orderBy: { createdAt: "desc" },
+  });
+  return NextResponse.json({ code: 0, data: children });
+});
 
 // POST /api/children - 创建孩子档案
-export async function POST(req: NextRequest) {
+export const POST = withErrorHandler(async (req: NextRequest) => {
   const auth = getAuthFromRequest(req);
   if (!auth) {
-    return NextResponse.json({ code: 401, message: "未登录" }, { status: 401 });
+    throw errors.unauthorized();
   }
 
-  try {
-    const { name, gender, birthDate } = await req.json();
+  const { name, gender, birthDate } = await req.json();
 
-    if (!name || !gender || !birthDate) {
-      return NextResponse.json({ code: 400, message: "name, gender and birthDate required" }, { status: 400 });
-    }
-
-    const child = await prisma.child.create({
-      data: {
-        userId: auth.userId,
-        name,
-        gender,
-        birthDate: new Date(birthDate),
-      },
-      select: {
-        id: true,
-        name: true,
-        gender: true,
-        birthDate: true,
-        createdAt: true,
-      },
-    });
-
-    return NextResponse.json({ code: 0, data: child });
-  } catch (err) {
-    console.error("DB error:", err);
-    return NextResponse.json({ code: 500, message: "服务器错误" }, { status: 500 });
+  if (!name || !gender || !birthDate) {
+    throw errors.badRequest("name, gender and birthDate required");
   }
-}
+
+  const child = await prisma.child.create({
+    data: {
+      userId: auth.userId,
+      name,
+      gender,
+      birthDate: new Date(birthDate),
+    },
+    select: {
+      id: true,
+      name: true,
+      gender: true,
+      birthDate: true,
+      createdAt: true,
+    },
+  });
+
+  return NextResponse.json({ code: 0, data: child });
+});
 
 // PUT /api/children - 更新孩子档案
-export async function PUT(req: NextRequest) {
+export const PUT = withErrorHandler(async (req: NextRequest) => {
   const auth = getAuthFromRequest(req);
   if (!auth) {
-    return NextResponse.json({ code: 401, message: "未登录" }, { status: 401 });
+    throw errors.unauthorized();
   }
 
-  try {
-    const { id, name, gender, birthDate } = await req.json();
+  const { id, name, gender, birthDate } = await req.json();
 
-    if (!id) {
-      return NextResponse.json({ code: 400, message: "id required" }, { status: 400 });
-    }
-
-    // 先验证是否属于当前用户
-    const existing = await prisma.child.findFirst({
-      where: { id, userId: auth.userId },
-      select: { id: true },
-    });
-
-    if (!existing) {
-      return NextResponse.json({ code: 403, message: "无权访问" }, { status: 403 });
-    }
-
-    const child = await prisma.child.update({
-      where: { id },
-      data: {
-        ...(name !== undefined && { name }),
-        ...(gender !== undefined && { gender }),
-        ...(birthDate !== undefined && { birthDate: new Date(birthDate) }),
-      },
-      select: {
-        id: true,
-        name: true,
-        gender: true,
-        birthDate: true,
-        createdAt: true,
-      },
-    });
-
-    return NextResponse.json({ code: 0, data: child });
-  } catch (err) {
-    console.error("DB error:", err);
-    return NextResponse.json({ code: 500, message: "服务器错误" }, { status: 500 });
+  if (!id) {
+    throw errors.badRequest("id required");
   }
-}
+
+  // 先验证是否属于当前用户
+  const existing = await prisma.child.findFirst({
+    where: { id, userId: auth.userId },
+    select: { id: true },
+  });
+
+  if (!existing) {
+    throw errors.forbidden();
+  }
+
+  const child = await prisma.child.update({
+    where: { id },
+    data: {
+      ...(name !== undefined && { name }),
+      ...(gender !== undefined && { gender }),
+      ...(birthDate !== undefined && { birthDate: new Date(birthDate) }),
+    },
+    select: {
+      id: true,
+      name: true,
+      gender: true,
+      birthDate: true,
+      createdAt: true,
+    },
+  });
+
+  return NextResponse.json({ code: 0, data: child });
+});
 
 // DELETE /api/children - 删除孩子档案
-export async function DELETE(req: NextRequest) {
+export const DELETE = withErrorHandler(async (req: NextRequest) => {
   const auth = getAuthFromRequest(req);
   if (!auth) {
-    return NextResponse.json({ code: 401, message: "未登录" }, { status: 401 });
+    throw errors.unauthorized();
   }
 
   const id = req.nextUrl.searchParams.get("id");
   if (!id) {
-    return NextResponse.json({ code: 400, message: "id required" }, { status: 400 });
+    throw errors.badRequest("id required");
   }
 
-  try {
-    // 先验证是否属于当前用户
-    const existing = await prisma.child.findFirst({
-      where: { id, userId: auth.userId },
-      select: { id: true },
-    });
+  // 先验证是否属于当前用户
+  const existing = await prisma.child.findFirst({
+    where: { id, userId: auth.userId },
+    select: { id: true },
+  });
 
-    if (!existing) {
-      return NextResponse.json({ code: 403, message: "无权访问" }, { status: 403 });
-    }
-
-    await prisma.child.delete({ where: { id } });
-    return NextResponse.json({ code: 0 });
-  } catch (err) {
-    console.error("DB error:", err);
-    return NextResponse.json({ code: 500, message: "服务器错误" }, { status: 500 });
+  if (!existing) {
+    throw errors.forbidden();
   }
-}
+
+  await prisma.child.delete({ where: { id } });
+  return NextResponse.json({ code: 0 });
+});

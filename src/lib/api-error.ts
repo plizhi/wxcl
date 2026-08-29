@@ -1,3 +1,5 @@
+import { NextRequest, NextResponse } from "next/server";
+
 export class ApiError extends Error {
   constructor(
     public status: number,
@@ -24,7 +26,7 @@ export const errors = {
 
 export function handlePrismaError(err: unknown): ApiError {
   if (err instanceof ApiError) {
-    throw err;
+    return err;
   }
 
   const e = err as { code?: string | number };
@@ -41,15 +43,24 @@ export function handlePrismaError(err: unknown): ApiError {
   return new ApiError(500, 500, "服务器错误");
 }
 
-export function withErrorHandler<T extends (...args: any[]) => Promise<ReturnType<T>>>(
-  fn: T
-): (...args: Parameters<T>) => Promise<ReturnType<T>> {
-  return async (...args: Parameters<T>) => {
+type RouteHandler = (
+  req: NextRequest,
+  context?: any
+) => Promise<NextResponse | Response>;
+
+export function withErrorHandler(handler: RouteHandler): RouteHandler {
+  return async (req: NextRequest, context?: any) => {
     try {
-      return await fn(...args);
-    } catch (err) {
-      if (err instanceof ApiError) throw err;
-      throw handlePrismaError(err);
+      return await handler(req, context);
+    } catch (err: unknown) {
+      console.error("[API Error]", err);
+
+      if (err instanceof ApiError) {
+        return NextResponse.json(err.toResponse(), { status: err.status });
+      }
+
+      const prismaError = handlePrismaError(err);
+      return NextResponse.json(prismaError.toResponse(), { status: prismaError.status });
     }
   };
 }

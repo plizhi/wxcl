@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getAuthFromRequest } from "@/lib/auth-utils";
 import { callAI, parseAIResponse } from "@/lib/ai";
 import { DailyCareReport } from "@/lib/types";
+import { withErrorHandler, errors } from "@/lib/api-error";
 
 // 根据用户身份构建 system prompt
 function buildSystemPrompt(basePrompt: string, parentRole?: string): string {
@@ -233,96 +234,85 @@ function buildPromptWithHistory(
   return basePrompt.replace('禁止说教。禁止空洞的"你做得很好"。', '禁止说教。禁止空洞的"你做得很好"。' + historySection);
 }
 
-export async function POST(req: NextRequest) {
+export const POST = withErrorHandler(async (req: NextRequest) => {
   const auth = getAuthFromRequest(req);
-  if (!auth) {
-    return NextResponse.json({ code: 401, message: "未登录" }, { status: 401 });
+  if (!auth) throw errors.unauthorized();
+
+  const { content, childId: requestedChildId, intent = "daily", parentRole } = await req.json();
+
+  if (!content || typeof content !== "string") {
+    throw errors.badRequest("内容不能为空");
   }
 
-  try {
-    const { content, childId: requestedChildId, intent = "daily", parentRole } = await req.json();
+  const maxLength = 2000;
+  if (content.length > maxLength) {
+    throw errors.badRequest(`内容不能超过${maxLength}字`);
+  }
 
-    if (!content || typeof content !== "string") {
-      return NextResponse.json({ code: 400, message: "内容不能为空" }, { status: 400 });
-    }
+  let childId = requestedChildId;
 
-    const maxLength = 2000;
-    if (content.length > maxLength) {
-      return NextResponse.json({ code: 400, message: `内容不能超过${maxLength}字` }, { status: 400 });
-    }
-
-    let childId = requestedChildId;
-
+  if (!childId) {
+    childId = await getUserFirstChildId(auth.userId);
     if (!childId) {
-      childId = await getUserFirstChildId(auth.userId);
-      if (!childId) {
-        return NextResponse.json({ code: 400, message: "请先添加孩子" }, { status: 400 });
-      }
-    } else {
-      const isValid = await validateChildId(auth.userId, childId);
-      if (!isValid) {
-        return NextResponse.json({ code: 403, message: "无权访问该孩子的数据" }, { status: 403 });
-      }
+      throw errors.badRequest("请先添加孩子");
     }
-
-    let historyOpportunities: { dimension?: string; element?: string; description: string; suggestion?: string; appearanceCount: number }[] = [];
-    if (intent === "daily" && childId) {
-      historyOpportunities = await getOpenOpportunities(childId);
+  } else {
+    const isValid = await validateChildId(auth.userId, childId);
+    if (!isValid) {
+      throw errors.forbidden("无权访问该孩子的数据");
     }
-
-    const basePrompt = (SYSTEM_PROMPTS as Record<string, string>)[intent] || SYSTEM_PROMPTS.analyze;
-    const systemPrompt = buildPromptWithHistory(buildSystemPrompt(basePrompt, parentRole), historyOpportunities);
-
-    const aiResponse = await callAI({
-      messages: [{ role: "user", content }],
-      systemPrompt,
-      maxTokens: 1000,
-      jsonMode: true,
-    });
-
-    const report = parseAIResponse<DailyCareReport>(aiResponse.content);
-    if (!report) {
-      throw new Error("AI 响应解析失败");
-    }
-
-    let recordId: string | undefined;
-    if (childId) {
-      try {
-        const record = await prisma.record.create({
-          data: {
-            childId,
-            content,
-            reply: JSON.stringify(report),
-            intent: intent as "daily" | "emergency" | "nourishment",
-          },
-          select: { id: true },
-        });
-        recordId = record.id;
-
-        if (intent === "daily" && recordId) {
-          const opportunities = [
-            report.opportunity_axis1,
-            report.opportunity_axis2,
-            report.opportunity_axis3,
-          ].filter(Boolean) as Array<{ dimension?: string; description?: string; suggestion?: string } | null>;
-          await saveOpportunities(childId, recordId, opportunities);
-        }
-      } catch (dbErr) {
-        console.error("Failed to save record:", dbErr);
-      }
-    }
-
-    return NextResponse.json({
-      ...report,
-      recordId,
-      intent,
-      touchPoint: "",
-      thinkingShift: "",
-      plannedAction: "",
-      historyOpportunities: historyOpportunities.length > 0 ? historyOpportunities : undefined,
-    });
-  } catch (err) {
-    console.error("Analyze error:", err);
-    return NextResponse.json({ code: 500, message: "分析失败，请稍后重试" }, { status: 500 });
   }
-}
+
+  let historyOpportunities: { dimension?: string; element?: string; description: string; suggestion?: string; appearanceCount: number }[] = [];
+  if (intent === "daily" && childId) {
+    historyOpportunities = await getOpenOpportunities(childId);
+  }
+
+  const basePrompt = (SYSTEM_PROMPTS as Record<string, string>)[intent] || SYSTEM_PROMPTS.analyze;
+  const systemPrompt = buildPromptWithHistory(buildSystemPrompt(basePrompt, parentRole), historyOpportunities);
+
+  const aiResponse = await callAI({
+    messages: [{ role: "user", content }],
+    systemPrompt,
+    maxTokens: 1000,
+    jsonMode: true,
+  });
+
+  const report = parseAIResponse<DailyCareReport>(aiResponse.content);
+  if (!report) {
+    throw new Error("AI 响应解析失败");
+  }
+
+  let recordId: string | undefined;
+  if (childId) {
+    const record = await prisma.record.create({
+      data: {
+        childId,
+        content,
+        reply: JSON.stringify(report),
+        intent: intent as "daily" | "emergency" | "nourishment",
+      },
+      select: { id: true },
+    });
+    recordId = record.id;
+
+    if (intent === "daily" && recordId) {
+      const opportunities = [
+        report.opportunity_axis1,
+        report.opportunity_axis2,
+        report.opportunity_axis3,
+      ].filter(Boolean) as Array<{ dimension?: string; description?: string; suggestion?: string } | null>;
+      await saveOpportunities(childId, recordId, opportunities);
+    }
+  }
+
+  return NextResponse.json({
+    ...report,
+    recordId,
+    intent,
+    touchPoint: "",
+    thinkingShift: "",
+    plannedAction: "",
+    historyOpportunities: historyOpportunities.length > 0 ? historyOpportunities : undefined,
+  });
+});

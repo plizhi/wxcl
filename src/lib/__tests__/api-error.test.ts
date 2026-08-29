@@ -82,8 +82,9 @@ describe('handlePrismaError', () => {
     expect(err.message).toBe('服务器错误');
   });
 
-  it('ApiError 直接抛出（不转换）', () => {
+  it('ApiError 直接返回（不转换）', () => {
     const original = new ApiError(400, 400, '自定义错误');
-    expect(() => handlePrismaError(original)).toThrow(original);
+    const result = handlePrismaError(original);
+    expect(result).toBe(original);
   });
 });
