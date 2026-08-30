@@ -249,6 +249,23 @@ export default function ProfilePage() {
         </button>
       </div>
 
+      {/* 推广数据中心入口 */}
+      <div className="mx-4 mt-4 bg-white rounded-2xl shadow-sm overflow-hidden">
+        <button
+          onClick={() => router.push('/apply/stats')}
+          className="w-full flex items-center justify-between px-5 py-4"
+        >
+          <div className="flex items-center gap-3">
+            <span className="text-xl">📊</span>
+            <div className="text-left">
+              <p className="text-gray-700">推广数据中心</p>
+              <p className="text-xs text-gray-400">查看邀请推广数据</p>
+            </div>
+          </div>
+          <span className="text-gray-400">→</span>
+        </button>
+      </div>
+
       {/* 服务条款 */}
       <div className="mx-4 mt-4 bg-white rounded-2xl shadow-sm overflow-hidden">
         <button onClick={() => router.push('/terms')} className="w-full flex items-center justify-between px-5 py-4">
