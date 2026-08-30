@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getAuthFromRequest } from "@/lib/auth-utils";
+import { withErrorHandler, errors } from "@/lib/api-error";
 
-export async function GET(req: NextRequest) {
+export const GET = withErrorHandler(async (req: NextRequest) => {
   const auth = getAuthFromRequest(req);
   if (!auth) {
-    return NextResponse.json({ code: 401, message: "未登录" }, { status: 401 });
+    throw errors.unauthorized();
   }
 
   const { searchParams } = new URL(req.url);
@@ -13,7 +14,7 @@ export async function GET(req: NextRequest) {
   const status = searchParams.get("status") || "open";
 
   if (!childId) {
-    return NextResponse.json({ code: 400, message: "缺少 childId" }, { status: 400 });
+    throw errors.badRequest("缺少 childId");
   }
 
   const child = await prisma.child.findFirst({
@@ -22,7 +23,7 @@ export async function GET(req: NextRequest) {
   });
 
   if (!child) {
-    return NextResponse.json({ code: 403, message: "无权访问" }, { status: 403 });
+    throw errors.forbidden("无权访问");
   }
 
   const opportunities = await prisma.profileOpportunity.findMany({
@@ -43,42 +44,37 @@ export async function GET(req: NextRequest) {
   });
 
   return NextResponse.json({ code: 0, data: { opportunities } });
-}
+});
 
-export async function PATCH(req: NextRequest) {
+export const PATCH = withErrorHandler(async (req: NextRequest) => {
   const auth = getAuthFromRequest(req);
   if (!auth) {
-    return NextResponse.json({ code: 401, message: "未登录" }, { status: 401 });
+    throw errors.unauthorized();
   }
 
-  try {
-    const { opportunityId, status } = await req.json();
+  const { opportunityId, status } = await req.json();
 
-    if (!opportunityId || !status) {
-      return NextResponse.json({ code: 400, message: "缺少参数" }, { status: 400 });
-    }
-
-    // 验证机会窗口属于该用户的孩子
-    const opp = await prisma.profileOpportunity.findFirst({
-      where: {
-        id: opportunityId,
-        child: { userId: auth.userId },
-      },
-      select: { id: true },
-    });
-
-    if (!opp) {
-      return NextResponse.json({ code: 403, message: "无权访问" }, { status: 403 });
-    }
-
-    await prisma.profileOpportunity.update({
-      where: { id: opportunityId },
-      data: { status },
-    });
-
-    return NextResponse.json({ code: 0, message: "更新成功" });
-  } catch (err) {
-    console.error("Failed to update opportunity:", err);
-    return NextResponse.json({ code: 500, message: "服务器错误" }, { status: 500 });
+  if (!opportunityId || !status) {
+    throw errors.badRequest("缺少参数");
   }
-}
+
+  // 验证机会窗口属于该用户的孩子
+  const opp = await prisma.profileOpportunity.findFirst({
+    where: {
+      id: opportunityId,
+      child: { userId: auth.userId },
+    },
+    select: { id: true },
+  });
+
+  if (!opp) {
+    throw errors.forbidden("无权访问");
+  }
+
+  await prisma.profileOpportunity.update({
+    where: { id: opportunityId },
+    data: { status },
+  });
+
+  return NextResponse.json({ code: 0, message: "更新成功" });
+});

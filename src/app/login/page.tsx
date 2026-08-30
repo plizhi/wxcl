@@ -161,12 +161,12 @@ export default function LoginPage() {
               onClick={() => setShowForgotModal(true)}
               className="w-full py-2 text-center text-sm text-gray-400 hover:text-gray-600"
             >
-              忘记密码？使用激活码登录
+              忘记密码？使用邀请码登录
             </button>
           </div>
 
           <p className="text-center text-xs text-gray-400 mt-6 leading-relaxed">
-            没有账号？<a href="/register" className="text-purple-500 font-medium">立即注册 →</a>
+            没有账号？<a href="/apply" className="text-purple-500 font-medium">申请体验 →</a>
           </p>
         </div>
       </div>

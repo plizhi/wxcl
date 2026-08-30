@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { logger } from "@/lib/logger";
+import { withErrorHandler, errors } from "@/lib/api-error";
 
 const SYSTEM_PROMPT = `你是「内在结构养育」顾问。用户会分享一段育儿困惑或亲子时刻。
 
@@ -83,58 +84,52 @@ const SYSTEM_PROMPT = `你是「内在结构养育」顾问。用户会分享一
 - 禁止说教、禁止给方法建议
 - 语气温暖专业，像一面镜子帮助家长看见孩子`;
 
-export async function POST(req: NextRequest) {
-  try {
-    const { message, childAge } = await req.json();
+export const POST = withErrorHandler(async (req: NextRequest) => {
+  const { message, childAge } = await req.json();
 
-    if (!message || message.trim().length < 10) {
-      return NextResponse.json({ code: 400, message: "请输入更多内容，至少10个字" }, { status: 400 });
-    }
-
-    if (message.length > 500) {
-      return NextResponse.json({ code: 400, message: "内容过长，请控制在500字以内" }, { status: 400 });
-    }
-
-    const deepseekApi = process.env.DEEPSEEK_API_KEY;
-    if (!deepseekApi) {
-      return NextResponse.json({ code: 500, message: "服务未配置" }, { status: 500 });
-    }
-
-    const userContent = childAge
-      ? `[孩子年龄：${childAge}]\n\n${message}`
-      : message;
-
-    const response = await fetch("https://api.deepseek.com/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${deepseekApi}`,
-      },
-      body: JSON.stringify({
-        model: "deepseek-chat",
-        messages: [
-          { role: "system", content: SYSTEM_PROMPT },
-          { role: "user", content: userContent },
-        ],
-        max_tokens: 800,
-        stream: false,
-      }),
-    });
-
-    if (!response.ok) {
-      logger.error("Trial API deepseek error:", { status: response.status });
-      return NextResponse.json({ code: 500, message: "AI 服务异常" }, { status: 500 });
-    }
-
-    const data = await response.json();
-    const reply = data.choices?.[0]?.message?.content || "";
-
-    return NextResponse.json({
-      code: 0,
-      data: { reply }
-    });
-  } catch (err) {
-    logger.error("Trial API error:", { error: String(err) });
-    return NextResponse.json({ code: 500, message: "服务器错误" }, { status: 500 });
+  if (!message || message.trim().length < 10) {
+    throw errors.badRequest("请输入更多内容，至少10个字");
   }
-}
+
+  if (message.length > 500) {
+    throw errors.badRequest("内容过长，请控制在500字以内");
+  }
+
+  const deepseekApi = process.env.DEEPSEEK_API_KEY;
+  if (!deepseekApi) {
+    throw errors.serverError("服务未配置");
+  }
+
+  const userContent = childAge
+    ? `[孩子年龄：${childAge}]\n\n${message}`
+    : message;
+
+  const response = await fetch("https://api.deepseek.com/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${deepseekApi}`,
+    },
+    body: JSON.stringify({
+      model: "deepseek-chat",
+      messages: [
+        { role: "system", content: SYSTEM_PROMPT },
+        { role: "user", content: userContent },
+      ],
+      max_tokens: 800,
+      stream: false,
+    }),
+  });
+
+  if (!response.ok) {
+    throw errors.serverError("AI 服务异常");
+  }
+
+  const data = await response.json();
+  const reply = data.choices?.[0]?.message?.content || "";
+
+  return NextResponse.json({
+    code: 0,
+    data: { reply }
+  });
+});

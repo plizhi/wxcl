@@ -237,9 +237,9 @@ export default function LandingPage() {
 
           <div className="text-center mt-6">
             <p className="text-stone-400 text-xs mb-3">注册后可解锁完整功能：记录、报告、持续陪伴</p>
-            <Link href="/register"
+            <Link href="/apply"
               className="inline-block px-6 py-2 bg-gradient-to-r from-amber-600 to-orange-600 text-white rounded-full font-medium text-sm">
-              立即注册体验完整版 →
+              申请体验资格 →
             </Link>
           </div>
         </div>
@@ -300,9 +300,9 @@ export default function LandingPage() {
           <p className="text-stone-500 text-base mb-6">
             记录一件小事，<br />看看内在结构养育会帮你发现什么
           </p>
-          <Link href="/register"
+          <Link href="/apply"
             className="inline-block px-8 py-4 bg-gradient-to-r from-amber-600 to-orange-600 text-white rounded-full font-medium text-lg shadow-lg shadow-amber-200 hover:shadow-xl hover:scale-105 transition-all">
-            立即开始体验 →
+            申请体验 →
           </Link>
         </div>
       </section>

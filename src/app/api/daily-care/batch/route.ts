@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getAuthFromRequest } from "@/lib/auth-utils";
 import { callAI, parseAIResponse } from "@/lib/ai";
-import { logger } from "@/lib/logger";
+import { withErrorHandler, errors } from "@/lib/api-error";
 
 const SYSTEM_PROMPT = `你是「内在结构养育」陪伴顾问。分析多天记录，给出综合解读。
 
@@ -56,73 +56,62 @@ async function validateChildId(userId: string, childId: string): Promise<boolean
 }
 
 // POST /api/daily-care/batch - 批量导入回忆记录
-export async function POST(req: NextRequest) {
+export const POST = withErrorHandler(async (req: NextRequest) => {
   const auth = getAuthFromRequest(req);
-  if (!auth) {
-    return NextResponse.json({ code: 401, message: "未登录" }, { status: 401 });
+  if (!auth) throw errors.unauthorized();
+
+  const { records, childId: requestedChildId } = await req.json();
+
+  if (!records || !Array.isArray(records) || records.length === 0) {
+    throw errors.badRequest("records is required and must be a non-empty array");
   }
 
-  try {
-    const { records, childId: requestedChildId } = await req.json();
+  let childId = requestedChildId;
 
-    if (!records || !Array.isArray(records) || records.length === 0) {
-      return NextResponse.json({ code: 400, message: "records is required and must be a non-empty array" }, { status: 400 });
-    }
-
-    let childId = requestedChildId;
-
+  if (!childId) {
+    childId = await getUserFirstChildId(auth.userId);
     if (!childId) {
-      childId = await getUserFirstChildId(auth.userId);
-      if (!childId) {
-        return NextResponse.json({ code: 400, message: "请先添加孩子" }, { status: 400 });
-      }
-    } else {
-      const isValid = await validateChildId(auth.userId, childId);
-      if (!isValid) {
-        return NextResponse.json({ code: 403, message: "无权访问该孩子的数据" }, { status: 403 });
-      }
+      throw errors.badRequest("请先添加孩子");
     }
-
-    // 批量插入记录
-    for (const content of records) {
-      try {
-        await prisma.record.create({
-          data: {
-            childId,
-            content,
-            intent: "daily",
-          },
-        });
-      } catch (err) {
-        logger.error("Failed to save record:", { error: String(err) });
-      }
+  } else {
+    const isValid = await validateChildId(auth.userId, childId);
+    if (!isValid) {
+      throw errors.forbidden("无权访问该孩子的数据");
     }
-
-    // 构建记录摘要用于 AI 分析
-    const recordSummaries = records.map((r: string, i: number) =>
-      `[记录${i + 1}]: ${r}`
-    ).join('\n\n');
-
-    // 调用 AI 分析（使用 jsonMode）
-    const aiResponse = await callAI({
-      messages: [
-        { role: "system", content: SYSTEM_PROMPT },
-        { role: "user", content: `以下是家长的初始回忆记录：\n\n${recordSummaries}\n\n请给出综合分析。` },
-      ],
-      maxTokens: 1500,
-      jsonMode: true,
-    });
-
-    let report;
-    try {
-      report = parseAIResponse(aiResponse.content);
-    } catch {
-      report = { growth_summary: aiResponse.content.substring(0, 200) };
-    }
-
-    return NextResponse.json({ code: 0, message: "成功", data: report });
-  } catch (err) {
-    logger.error("Batch import error:", { error: String(err) });
-    return NextResponse.json({ code: 500, message: "服务器错误" }, { status: 500 });
   }
-}
+
+  // 批量插入记录
+  for (const content of records) {
+    await prisma.record.create({
+      data: {
+        childId,
+        content,
+        intent: "daily",
+      },
+    });
+  }
+
+  // 构建记录摘要用于 AI 分析
+  const recordSummaries = records.map((r: string, i: number) =>
+    `[记录${i + 1}]: ${r}`
+  ).join('\n\n');
+
+  // 调用 AI 分析（使用 jsonMode）
+  const aiResponse = await callAI({
+    messages: [
+      { role: "system", content: SYSTEM_PROMPT },
+      { role: "user", content: `以下是家长的初始回忆记录：\n\n${recordSummaries}\n\n请给出综合分析。` },
+    ],
+    maxTokens: 1500,
+    jsonMode: true,
+  });
+
+  let report;
+  try {
+    report = parseAIResponse(aiResponse.content);
+  } catch {
+    report = { growth_summary: aiResponse.content.substring(0, 200) };
+  }
+
+  return NextResponse.json({ code: 0, message: "成功", data: report });
+});

@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import { withErrorHandler, errors } from "@/lib/api-error";
 import { prisma } from "@/lib/prisma";
 import { getAuthFromRequest } from "@/lib/auth-utils";
 import { callAI } from "@/lib/ai";
-import { logger } from "@/lib/logger";
 
 const SYSTEM_PROMPTS = {
   daily: `你是「内在结构养育」陪伴顾问。分析今日记录，给出：1个亮点 + 1个机会。不用 JSON，用 Markdown。不超过100字。禁止说教。`,
@@ -34,66 +34,57 @@ async function validateChildId(userId: string, childId: string): Promise<boolean
   return !!child;
 }
 
-export async function POST(req: NextRequest) {
+export const POST = withErrorHandler(async (req: NextRequest) => {
   const auth = getAuthFromRequest(req);
   if (!auth) {
-    return NextResponse.json({ code: 401, message: "未登录" }, { status: 401 });
+    throw errors.unauthorized();
   }
 
-  try {
-    const { message, childId, intent: intentOverride, systemPrompt } = await req.json();
+  const { message, childId, intent: intentOverride, systemPrompt } = await req.json();
 
-    if (!message) {
-      return NextResponse.json({ code: 400, message: "message is required" }, { status: 400 });
+  if (!message) {
+    throw errors.badRequest("message is required");
+  }
+
+  const intent = intentOverride || classify(message);
+  const finalSystemPrompt =
+    systemPrompt ||
+    SYSTEM_PROMPTS[intent as keyof typeof SYSTEM_PROMPTS] ||
+    SYSTEM_PROMPTS.chat;
+
+  const aiResponse = await callAI({
+    messages: [
+      { role: "system", content: finalSystemPrompt },
+      { role: "user", content: message },
+    ],
+    maxTokens: 500,
+  });
+
+  const reply = aiResponse.content || "没有收到回复";
+
+  // 确定要使用的 childId
+  let finalChildId: string | null = null;
+  if (childId) {
+    const isValid = await validateChildId(auth.userId, childId);
+    if (isValid) {
+      finalChildId = childId;
     }
+  }
+  if (!finalChildId) {
+    finalChildId = await getUserFirstChildId(auth.userId);
+  }
 
-    const intent = intentOverride || classify(message);
-    const finalSystemPrompt =
-      systemPrompt ||
-      SYSTEM_PROMPTS[intent as keyof typeof SYSTEM_PROMPTS] ||
-      SYSTEM_PROMPTS.chat;
-
-    const aiResponse = await callAI({
-      messages: [
-        { role: "system", content: finalSystemPrompt },
-        { role: "user", content: message },
-      ],
-      maxTokens: 500,
+  // 保存记录
+  if (finalChildId) {
+    await prisma.record.create({
+      data: {
+        childId: finalChildId,
+        content: message,
+        reply,
+        intent: intent as "daily" | "emergency" | "nourishment",
+      },
     });
-
-    const reply = aiResponse.content || "没有收到回复";
-
-    // 确定要使用的 childId
-    let finalChildId: string | null = null;
-    if (childId) {
-      const isValid = await validateChildId(auth.userId, childId);
-      if (isValid) {
-        finalChildId = childId;
-      }
-    }
-    if (!finalChildId) {
-      finalChildId = await getUserFirstChildId(auth.userId);
-    }
-
-    // 保存记录
-    if (finalChildId) {
-      try {
-        await prisma.record.create({
-          data: {
-            childId: finalChildId,
-            content: message,
-            reply,
-            intent: intent as "daily" | "emergency" | "nourishment",
-          },
-        });
-      } catch (dbErr) {
-        logger.error("Failed to save record:", { error: String(dbErr) });
-      }
-    }
-
-    return NextResponse.json({ code: 0, message: "成功", data: { reply, intent } });
-  } catch (err) {
-    logger.error("Chat API error:", { error: String(err) });
-    return NextResponse.json({ code: 500, message: "服务器错误" }, { status: 500 });
   }
-}
+
+  return NextResponse.json({ code: 0, message: "成功", data: { reply, intent } });
+});

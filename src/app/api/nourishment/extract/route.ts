@@ -1,7 +1,8 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getAuthFromRequest } from "@/lib/auth-utils";
 import { callAI, parseAIResponse } from "@/lib/ai";
+import { withErrorHandler, errors } from "@/lib/api-error";
 
 const SYSTEM_PROMPT = `你是「内在结构养育」陪伴顾问。请分析以下陪伴记录，识别其中蕴含的滋养时刻。
 
@@ -51,111 +52,106 @@ async function validateChildId(userId: string, childId: string): Promise<boolean
   return !!child;
 }
 
-export async function POST(req: NextRequest) {
+export const POST = withErrorHandler(async (req: NextRequest) => {
   const auth = getAuthFromRequest(req);
   if (!auth) {
-    return NextResponse.json({ code: 401, message: "未登录" }, { status: 401 });
+    throw errors.unauthorized();
   }
 
-  try {
-    const { limit = 10, childId } = await req.json();
+  const { limit = 10, childId } = await req.json();
 
-    let targetChildId = childId;
+  let targetChildId = childId;
+  if (!targetChildId) {
+    targetChildId = await getUserFirstChildId(auth.userId);
     if (!targetChildId) {
-      targetChildId = await getUserFirstChildId(auth.userId);
-      if (!targetChildId) {
-        return NextResponse.json({ code: 400, message: "请先添加孩子" }, { status: 400 });
-      }
+      throw errors.badRequest("请先添加孩子");
     }
+  }
 
-    const isValid = await validateChildId(auth.userId, targetChildId);
-    if (!isValid) {
-      return NextResponse.json({ code: 403, message: "无权访问该孩子的数据" }, { status: 403 });
-    }
+  const isValid = await validateChildId(auth.userId, targetChildId);
+  if (!isValid) {
+    throw errors.forbidden("无权访问该孩子的数据");
+  }
 
-    // 获取最近的陪伴记录（未提取过的）
-    const extractedRecordIds = await prisma.nourishmentMoment.findMany({
-      where: {
-        childId: targetChildId,
-        source: "extracted",
-      },
-      select: { extractedFromRecordId: true },
-    });
-    const excludedIds = extractedRecordIds
-      .map((r) => r.extractedFromRecordId)
-      .filter((id): id is string => id !== null);
+  // 获取最近的陪伴记录（未提取过的）
+  const extractedRecordIds = await prisma.nourishmentMoment.findMany({
+    where: {
+      childId: targetChildId,
+      source: "extracted",
+    },
+    select: { extractedFromRecordId: true },
+  });
+  const excludedIds = extractedRecordIds
+    .map((r) => r.extractedFromRecordId)
+    .filter((id): id is string => id !== null);
 
-    const records = await prisma.record.findMany({
-      where: {
-        childId: targetChildId,
-        intent: "daily",
-        ...(excludedIds.length > 0 ? { id: { notIn: excludedIds } } : {}),
-      },
-      select: { id: true, content: true, createdAt: true },
-      orderBy: { createdAt: "desc" },
-      take: limit,
-    });
+  const records = await prisma.record.findMany({
+    where: {
+      childId: targetChildId,
+      intent: "daily",
+      ...(excludedIds.length > 0 ? { id: { notIn: excludedIds } } : {}),
+    },
+    select: { id: true, content: true, createdAt: true },
+    orderBy: { createdAt: "desc" },
+    take: limit,
+  });
 
-    if (records.length === 0) {
-      return NextResponse.json({ extractions: [], message: "没有新的记录需要提取" });
-    }
+  if (records.length === 0) {
+    return { extractions: [], message: "没有新的记录需要提取" };
+  }
 
-    const extractions: { fact: string; feeling: string; recordId: string }[] = [];
+  const extractions: { fact: string; feeling: string; recordId: string }[] = [];
 
-    for (const record of records) {
-      try {
-        const aiResponse = await callAI({
-          messages: [{ role: "user", content: `分析以下记录：\n\n${record.content}` }],
-          systemPrompt: SYSTEM_PROMPT,
-          maxTokens: 500,
-          jsonMode: true,
-        });
+  for (const record of records) {
+    try {
+      const aiResponse = await callAI({
+        messages: [{ role: "user", content: `分析以下记录：\n\n${record.content}` }],
+        systemPrompt: SYSTEM_PROMPT,
+        maxTokens: 500,
+        jsonMode: true,
+      });
 
-        const result = parseAIResponse<{ extractions?: { fact?: string; feeling?: string }[] }>(
-          aiResponse.content
-        );
-        if (result?.extractions && Array.isArray(result.extractions)) {
-          for (const item of result.extractions) {
-            if (item.fact && item.fact.trim()) {
-              extractions.push({
-                fact: item.fact.trim(),
-                feeling: (item.feeling || "温暖").trim(),
-                recordId: record.id,
-              });
-            }
+      const result = parseAIResponse<{ extractions?: { fact?: string; feeling?: string }[] }>(
+        aiResponse.content
+      );
+      if (result?.extractions && Array.isArray(result.extractions)) {
+        for (const item of result.extractions) {
+          if (item.fact && item.fact.trim()) {
+            extractions.push({
+              fact: item.fact.trim(),
+              feeling: (item.feeling || "温暖").trim(),
+              recordId: record.id,
+            });
           }
         }
-      } catch {
-        // 解析失败，跳过
       }
+    } catch {
+      // 解析失败，跳过
     }
-
-    // 批量保存提取的滋养时刻
-    let savedCount = 0;
-    for (const extraction of extractions) {
-      try {
-        await prisma.nourishmentMoment.create({
-          data: {
-            childId: targetChildId,
-            fact: extraction.fact,
-            feeling: extraction.feeling,
-            source: "extracted",
-            extractedFromRecordId: extraction.recordId,
-          },
-        });
-        savedCount++;
-      } catch {
-        // 可能已存在，跳过
-      }
-    }
-
-    return NextResponse.json({
-      extractions,
-      savedCount,
-      processedRecords: records.length,
-    });
-  } catch (err) {
-    console.error("Extract error:", err);
-    return NextResponse.json({ code: 500, message: "提取失败，请稍后重试" }, { status: 500 });
   }
-}
+
+  // 批量保存提取的滋养时刻
+  let savedCount = 0;
+  for (const extraction of extractions) {
+    try {
+      await prisma.nourishmentMoment.create({
+        data: {
+          childId: targetChildId,
+          fact: extraction.fact,
+          feeling: extraction.feeling,
+          source: "extracted",
+          extractedFromRecordId: extraction.recordId,
+        },
+      });
+      savedCount++;
+    } catch {
+      // 可能已存在，跳过
+    }
+  }
+
+  return {
+    extractions,
+    savedCount,
+    processedRecords: records.length,
+  };
+});
