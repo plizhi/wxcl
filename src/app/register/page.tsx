@@ -1,23 +1,32 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/components/ui/toast';
 
-export default function RegisterPage() {
+function RegisterPageContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { login } = useAuth();
   const { toast } = useToast();
   const [step, setStep] = useState(1); // 1: 注册信息, 2: 设置密码
   const [phone, setPhone] = useState('');
-  const [activationCode, setActivationCode] = useState('');
+  const [inviteCode, setInviteCode] = useState('');
   const [parentRole, setParentRole] = useState<'爸爸' | '妈妈' | ''>('');
   const [otherRole, setOtherRole] = useState('');
   const [showOtherDropdown, setShowOtherDropdown] = useState(false);
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
+
+  // 如果 URL 中有邀请码，自动填充
+  useEffect(() => {
+    const code = searchParams.get('inviteCode');
+    if (code) {
+      setInviteCode(code);
+    }
+  }, [searchParams]);
 
   const otherRoles = ['爷爷', '奶奶', '外公', '外婆', '姥爷', '姥姥', '哥哥', '姐姐', '叔叔', '阿姨', '其他'];
 
@@ -48,8 +57,8 @@ export default function RegisterPage() {
       toast('请输入正确的手机号', 'error');
       return;
     }
-    if (!activationCode) {
-      toast('请输入激活码', 'error');
+    if (!inviteCode) {
+      toast('请输入邀请码', 'error');
       return;
     }
     if (!getDisplayRole()) {
@@ -59,12 +68,12 @@ export default function RegisterPage() {
 
     setLoading(true);
     try {
-      await login(phone, activationCode, undefined, getDisplayRole() || undefined);
+      await login(phone, inviteCode, undefined, getDisplayRole() || undefined);
       setStep(2); // 进入设置密码步骤
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : String(error);
       if (msg.includes('已被使用')) {
-        toast('激活码已被使用', 'error');
+        toast('邀请码已被使用', 'error');
       } else {
         toast(msg || '注册失败', 'error');
       }
@@ -130,7 +139,7 @@ export default function RegisterPage() {
           {step === 1 ? (
             <>
               <h2 className="text-2xl font-bold text-gray-800 mb-2">注册</h2>
-              <p className="text-gray-500 mb-6">首次登录填写激活码即可注册</p>
+              <p className="text-gray-500 mb-6">首次登录填写邀请码即可注册</p>
 
               <div className="space-y-4">
                 {/* 角色选择 */}
@@ -208,10 +217,10 @@ export default function RegisterPage() {
                 <div>
                   <input
                     type="text"
-                    placeholder="激活码"
+                    placeholder="邀请码"
                     maxLength={8}
-                    value={activationCode}
-                    onChange={e => setActivationCode(e.target.value.toUpperCase())}
+                    value={inviteCode}
+                    onChange={e => setInviteCode(e.target.value.toUpperCase())}
                     className="w-full px-4 py-4 border border-gray-200 rounded-lg text-base text-center focus:outline-none focus:border-purple-500"
                   />
                 </div>
@@ -222,7 +231,7 @@ export default function RegisterPage() {
                   className="w-full py-4 rounded-full text-base font-medium text-white disabled:opacity-50"
                   style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}
                 >
-                  {loading ? '验证中...' : '验证激活码'}
+                  {loading ? '验证中...' : '验证邀请码'}
                 </button>
 
                 <p className="text-center text-sm text-gray-400 mt-4">
@@ -277,5 +286,17 @@ export default function RegisterPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function RegisterPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-amber-50 to-purple-50">
+        <div className="text-gray-400">加载中...</div>
+      </div>
+    }>
+      <RegisterPageContent />
+    </Suspense>
   );
 }

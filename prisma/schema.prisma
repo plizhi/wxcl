@@ -300,3 +300,32 @@ model ParentReflection {
   @@index([userId])
   @@map("parent_reflections")
 }
+
+// ========== 邀请申请 ==========
+
+model Apply {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  phone       String    @unique @db.VarChar(20)
+  shareCode   String    @unique @map("share_code") @db.VarChar(8)
+  status      String    @default("pending") @db.VarChar(20) // pending/invite_ready/activated
+  referrerId  String?   @map("referrer_id") @db.Uuid
+  inviteCode  String?   @unique @map("invite_code") @db.VarChar(8)
+  inviteUsedAt DateTime? @map("invite_used_at") @db.Timestamp
+  inviteExpiresAt DateTime? @map("invite_expires_at") @db.Timestamp
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamp
+
+  @@index([referrerId])
+  @@map("applies")
+}
+
+model ShareLog {
+  id        String    @id @default(cuid())
+  applyId   String    @map("apply_id") @db.Uuid
+  visitorIp String?   @map("visitor_ip") @db.VarChar(50)
+  applied   Boolean   @default(false)
+  appliedAt DateTime? @map("applied_at") @db.Timestamp
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamp
+
+  @@index([applyId])
+  @@map("share_logs")
+}

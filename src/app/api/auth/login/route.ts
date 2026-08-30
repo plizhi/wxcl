@@ -17,9 +17,45 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
 
   if (!password) {
     if (!activationCode) {
-      throw errors.badRequest("请输入激活码或密码");
+      throw errors.badRequest("请输入邀请码或密码");
     }
 
+    // 先尝试新的 Apply 邀请码机制
+    const applyInvite = await prisma.apply.findFirst({
+      where: {
+        inviteCode: activationCode,
+        inviteUsedAt: null,
+      },
+    });
+
+    if (applyInvite && applyInvite.inviteExpiresAt && new Date(applyInvite.inviteExpiresAt) > new Date()) {
+      // 使用新的 Apply 邀请码
+      // 查找或创建用户
+      let targetUserId: string;
+      if (user) {
+        targetUserId = user.id;
+      } else {
+        const newUser = await prisma.user.create({
+          data: { phone, nickname: "用户", parentRole: parentRole || null },
+        });
+        targetUserId = newUser.id;
+      }
+
+      // 标记邀请码已使用
+      await prisma.apply.update({
+        where: { id: applyInvite.id },
+        data: { inviteUsedAt: new Date(), status: 'activated' },
+      });
+
+      const token = generateToken({ userId: targetUserId, phone });
+      return NextResponse.json({
+        code: 0,
+        message: "注册成功",
+        data: { token, userId: targetUserId },
+      });
+    }
+
+    // 回退到旧的 AuthSession 激活码机制
     const codeSession = await prisma.authSession.findFirst({
       where: {
         code: activationCode,
@@ -29,12 +65,12 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
     });
 
     if (!codeSession) {
-      throw errors.badRequest("激活码无效或已过期");
+      throw errors.badRequest("邀请码无效或已过期");
     }
 
     if (!codeSession.phone) {
       if (user) {
-        throw errors.badRequest("该激活码已被使用，请使用密码登录");
+        throw errors.badRequest("该邀请码已被使用，请使用密码登录");
       }
 
       await prisma.authSession.update({
@@ -60,7 +96,7 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
       }
 
       if (codeSession.phone !== phone) {
-        throw errors.badRequest("激活码无效");
+        throw errors.badRequest("邀请码无效");
       }
 
       const hashedCode = hashPassword(activationCode);
