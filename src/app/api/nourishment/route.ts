@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getAuthFromRequest } from "@/lib/auth-utils";
 import { withErrorHandler, errors } from "@/lib/api-error";
+import { apiSuccess } from "@/lib/response";
 
 async function getUserFirstChildId(userId: string): Promise<string | null> {
   const child = await prisma.child.findFirst({
@@ -61,11 +62,7 @@ export const GET = withErrorHandler(async (req: NextRequest) => {
     prisma.nourishmentMoment.count({ where: { childId } }),
   ]);
 
-  return {
-    code: 0,
-    message: "成功",
-    data: { moments, total, limit, offset },
-  };
+  return apiSuccess({ moments, total, limit, offset });
 });
 
 export const POST = withErrorHandler(async (req: NextRequest) => {
@@ -111,5 +108,5 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     },
   });
 
-  return { code: 0, message: "成功", data: { moment } };
+  return apiSuccess({ moment });
 });

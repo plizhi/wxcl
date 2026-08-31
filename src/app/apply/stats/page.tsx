@@ -4,6 +4,7 @@ import { useState, useEffect, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useToast } from '@/components/ui/toast';
+import { useAuth } from '@/context/AuthContext';
 
 interface Contributor {
   id: string;
@@ -31,50 +32,41 @@ interface RankingItem {
 function StatsPageContent() {
   const router = useRouter();
   const { toast } = useToast();
+  const { user, isLoading: authLoading } = useAuth();
 
   const [loading, setLoading] = useState(true);
-  const [phone, setPhone] = useState('');
   const [stats, setStats] = useState<{
     myStats: MyStats;
     ranking: RankingItem[];
     myRanking: number | null;
   } | null>(null);
 
-  useEffect(() => {
-    // 从 localStorage 获取手机号
-    const savedPhone = localStorage.getItem('applyPhone') || '';
-    if (savedPhone) {
-      setPhone(savedPhone);
-    }
-  }, []);
+  async function fetchStats(phone: string) {
+    try {
+      const res = await fetch(`/api/apply/stats?phone=${phone}`);
+      const result = await res.json();
 
-  useEffect(() => {
-    if (!phone) {
-      setLoading(false);
-      return;
-    }
-
-    async function fetchStats() {
-      try {
-        const res = await fetch(`/api/apply/stats?phone=${phone}`);
-        const result = await res.json();
-
-        if (result.code === 0) {
-          setStats(result.data);
-        } else {
-          toast(result.message || '获取数据失败', 'error');
-        }
-      } catch (e) {
-        toast('网络异常', 'error');
-      } finally {
-        setLoading(false);
+      if (result.code === 0) {
+        setStats(result.data);
+      } else {
+        toast(result.message || '获取数据失败', 'error');
       }
+    } catch (e) {
+      toast('网络异常', 'error');
+    } finally {
+      setLoading(false);
     }
+  }
 
-    fetchStats();
-  }, [phone, toast]);
+  useEffect(() => {
+    if (!authLoading && user?.phone) {
+      fetchStats(user.phone);
+    } else if (!authLoading && !user?.phone) {
+      setLoading(false);
+    }
+  }, [user, authLoading]);
 
-  if (loading) {
+  if (authLoading || loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-amber-50 to-purple-50">
         <div className="text-gray-400">加载中...</div>
@@ -82,35 +74,18 @@ function StatsPageContent() {
     );
   }
 
-  if (!phone) {
+  if (!user?.phone) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-amber-50 to-purple-50 px-6">
-        <div className="bg-white rounded-2xl p-8 shadow-xl max-w-sm w-full">
+        <div className="bg-white rounded-2xl p-8 shadow-xl max-w-sm w-full text-center">
           <h2 className="text-2xl font-bold text-gray-800 mb-4">推广数据中心</h2>
-          <p className="text-gray-500 mb-6">请输入你的手机号查看推广数据</p>
-          <input
-            type="tel"
-            placeholder="手机号"
-            maxLength={11}
-            value={phone}
-            onChange={e => setPhone(e.target.value.replace(/\D/g, ''))}
-            className="w-full px-4 py-3 border border-gray-200 rounded-lg text-center mb-4"
-          />
-          <button
-            onClick={() => {
-              localStorage.setItem('applyPhone', phone);
-              window.location.reload();
-            }}
-            className="w-full py-3 bg-purple-600 text-white rounded-full"
+          <p className="text-gray-500 mb-6">请先登录后查看推广数据</p>
+          <Link
+            href="/login"
+            className="block w-full py-3 bg-purple-600 text-white rounded-full text-center"
           >
-            查看
-          </button>
-          <button
-            onClick={() => router.push('/apply')}
-            className="w-full py-3 text-gray-400 text-sm mt-4"
-          >
-            返回申请页
-          </button>
+            去登录
+          </Link>
         </div>
       </div>
     );
@@ -119,13 +94,16 @@ function StatsPageContent() {
   if (!stats) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-amber-50 to-purple-50 px-6">
-        <div className="text-gray-400 mb-4">暂无数据</div>
-        <button
-          onClick={() => router.push('/apply')}
-          className="py-3 text-purple-600 text-sm"
-        >
-          返回申请页
-        </button>
+        <div className="bg-white rounded-2xl p-8 shadow-xl max-w-sm w-full text-center">
+          <h2 className="text-2xl font-bold text-gray-800 mb-4">推广数据中心</h2>
+          <p className="text-gray-500 mb-6">你还没有申请记录</p>
+          <Link
+            href="/apply"
+            className="block w-full py-3 bg-purple-600 text-white rounded-full text-center"
+          >
+            去申请
+          </Link>
+        </div>
       </div>
     );
   }
