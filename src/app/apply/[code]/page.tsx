@@ -1,17 +1,21 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useToast } from '@/components/ui/toast';
+import html2canvas from 'html2canvas';
 
 export default function ApplyStatusPage() {
   const params = useParams();
   const router = useRouter();
   const { toast } = useToast();
   const shareCode = params.code as string;
+  const posterRef = useRef<HTMLDivElement>(null);
 
   const [loading, setLoading] = useState(true);
+  const [showPoster, setShowPoster] = useState(false);
+  const [savingPoster, setSavingPoster] = useState(false);
   const [data, setData] = useState<{
     shareCode: string;
     status: string;
@@ -82,6 +86,30 @@ export default function ApplyStatusPage() {
       toast('网络异常', 'error');
     } finally {
       setLoading(false);
+    }
+  }
+
+  // 下载海报
+  async function downloadPoster() {
+    if (!posterRef.current) return;
+    setSavingPoster(true);
+    try {
+      const canvas = await html2canvas(posterRef.current, {
+        backgroundColor: '#fff',
+        scale: 2,
+        useCORS: true,
+        logging: false,
+      });
+      const link = document.createElement('a');
+      link.download = `望杏林邀请_${data?.shareCode || ''}.png`;
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+      toast('海报已保存', 'success');
+    } catch (e) {
+      console.error('生成海报失败', e);
+      toast('生成海报失败', 'error');
+    } finally {
+      setSavingPoster(false);
     }
   }
 
@@ -213,6 +241,64 @@ export default function ApplyStatusPage() {
                 <p className="text-xs text-gray-400">
                   有效期至 {data.inviteExpiresAt ? new Date(data.inviteExpiresAt).toLocaleDateString() : '7天后'}
                 </p>
+              </div>
+            </div>
+          )}
+
+          {/* 海报 */}
+          <div className="mb-6">
+            <div className="flex justify-between items-center mb-3">
+              <p className="text-sm text-gray-500">分享海报</p>
+              <button
+                onClick={() => setShowPoster(!showPoster)}
+                className="text-sm text-purple-600"
+              >
+                {showPoster ? '收起' : '预览海报'}
+              </button>
+            </div>
+            <button
+              onClick={downloadPoster}
+              disabled={savingPoster}
+              className="w-full py-3 bg-gradient-to-r from-purple-600 to-pink-500 text-white rounded-xl text-sm font-medium disabled:opacity-50"
+            >
+              {savingPoster ? '生成中...' : '📥 保存海报到相册'}
+            </button>
+          </div>
+
+          {/* 海报预览 */}
+          {showPoster && (
+            <div className="mb-6 p-4 bg-gray-50 rounded-xl">
+              <div ref={posterRef} className="bg-white rounded-lg overflow-hidden">
+                {/* 海报内容 */}
+                <div className="relative bg-gradient-to-br from-purple-100 to-amber-50 p-6 text-center">
+                  <div className="absolute inset-0 opacity-10">
+                    <div className="w-full h-full bg-cover bg-center" style={{ backgroundImage: 'url(/media/apricot-forest-full.png)' }} />
+                  </div>
+                  <div className="relative">
+                    <p className="text-xs text-purple-600 mb-1">让我们一起在时光里</p>
+                    <h2 className="text-xl font-bold text-gray-800 mb-2">望杏成林</h2>
+                    <p className="text-sm text-gray-600 mb-4">看见孩子，看见自己</p>
+                    {/* 二维码 */}
+                    <div className="mx-auto w-32 h-32 bg-white rounded-lg p-2 shadow-sm mb-4">
+                      <img
+                        src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(shareUrl)}`}
+                        alt="二维码"
+                        className="w-full h-full"
+                      />
+                    </div>
+                    <p className="text-xs text-gray-400 mb-2">扫码体验望杏成林</p>
+                    {!hasInviteCode && (
+                      <p className="text-xs text-amber-600">分享可得邀请码，与朋友一起成长</p>
+                    )}
+                    {hasInviteCode && (
+                      <p className="text-xs text-green-600">邀请码：{data.inviteCode}</p>
+                    )}
+                  </div>
+                </div>
+                {/* 底部 */}
+                <div className="bg-gradient-to-r from-purple-600 to-purple-800 py-3 text-center">
+                  <p className="text-white text-xs">内在结构养育 · 亲子陪伴观察</p>
+                </div>
               </div>
             </div>
           )}
