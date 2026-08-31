@@ -4,7 +4,6 @@ import { useState, useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useToast } from '@/components/ui/toast';
-import html2canvas from 'html2canvas';
 
 export default function ApplyStatusPage() {
   const params = useParams();
@@ -28,6 +27,8 @@ export default function ApplyStatusPage() {
       requiredContributors: number;
     };
   } | null>(null);
+
+  const [customMessage, setCustomMessage] = useState('一起看见孩子的内在结构');
 
   // 记录分享打开
   useEffect(() => {
@@ -94,12 +95,100 @@ export default function ApplyStatusPage() {
     if (!posterRef.current) return;
     setSavingPoster(true);
     try {
-      const canvas = await html2canvas(posterRef.current, {
-        backgroundColor: '#fff',
-        scale: 2,
-        useCORS: true,
-        logging: false,
-      });
+      // 预加载海报中的图片
+      const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(shareUrl)}`;
+
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      if (!ctx) throw new Error('无法创建画布');
+
+      canvas.width = 600;
+      canvas.height = 800;
+
+      // 绘制背景渐变
+      const gradient = ctx.createLinearGradient(0, 0, 600, 800);
+      gradient.addColorStop(0, '#f3e8ff');
+      gradient.addColorStop(1, '#fef3c7');
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, 600, 800);
+
+      // 绘制顶部装饰条
+      ctx.fillStyle = '#7c3aed';
+      ctx.fillRect(0, 0, 600, 8);
+
+      // 绘制标题区域
+      ctx.fillStyle = '#1f2937';
+      ctx.font = 'bold 36px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('望杏成林', 300, 100);
+
+      ctx.fillStyle = '#6b7280';
+      ctx.font = '18px sans-serif';
+      ctx.fillText('让我们一起在时光里', 300, 140);
+
+      // 绘制用户自定义文案
+      ctx.fillStyle = '#7c3aed';
+      ctx.font = 'bold 24px sans-serif';
+      ctx.fillText(customMessage, 300, 200);
+
+      // 绘制描述
+      ctx.fillStyle = '#4b5563';
+      ctx.font = '16px sans-serif';
+      ctx.fillText('看见孩子，看见自己', 300, 240);
+
+      // 绘制分隔线
+      ctx.strokeStyle = '#e5e7eb';
+      ctx.beginPath();
+      ctx.moveTo(100, 280);
+      ctx.lineTo(500, 280);
+      ctx.stroke();
+
+      // 绘制二维码
+      try {
+        const qrImg = new Image();
+        qrImg.crossOrigin = 'anonymous';
+        await new Promise<void>((resolve, reject) => {
+          qrImg.onload = () => resolve();
+          qrImg.onerror = () => reject();
+          qrImg.src = qrCodeUrl;
+        });
+        ctx.drawImage(qrImg, 200, 320, 200, 200);
+      } catch {
+        // 如果二维码加载失败，画一个占位符
+        ctx.fillStyle = '#f3f4f6';
+        ctx.fillRect(200, 320, 200, 200);
+        ctx.fillStyle = '#9ca3af';
+        ctx.font = '14px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('二维码加载失败', 300, 420);
+      }
+
+      // 绘制提示
+      ctx.fillStyle = '#6b7280';
+      ctx.font = '14px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('扫码体验望杏成林', 300, 560);
+
+      // 绘制邀请码
+      if (hasInviteCode && data?.inviteCode) {
+        ctx.fillStyle = '#059669';
+        ctx.font = 'bold 20px sans-serif';
+        ctx.fillText(`邀请码：${data.inviteCode}`, 300, 620);
+      } else {
+        ctx.fillStyle = '#d97706';
+        ctx.font = '16px sans-serif';
+        ctx.fillText('分享可得邀请码，与朋友一起成长', 300, 620);
+      }
+
+      // 绘制底部
+      ctx.fillStyle = '#7c3aed';
+      ctx.fillRect(0, 700, 600, 100);
+
+      ctx.fillStyle = '#ffffff';
+      ctx.font = '16px sans-serif';
+      ctx.fillText('内在结构养育 · 亲子陪伴观察', 300, 750);
+
+      // 下载
       const link = document.createElement('a');
       link.download = `望杏林邀请_${data?.shareCode || ''}.png`;
       link.href = canvas.toDataURL('image/png');
@@ -256,6 +345,19 @@ export default function ApplyStatusPage() {
                 {showPoster ? '收起' : '预览海报'}
               </button>
             </div>
+
+            {/* 自定义文案输入 */}
+            <div className="mb-3">
+              <input
+                type="text"
+                value={customMessage}
+                onChange={(e) => setCustomMessage(e.target.value.slice(0, 20))}
+                placeholder="输入你的推广文案（最多20字）"
+                className="w-full px-4 py-2 border border-gray-200 rounded-lg text-sm"
+              />
+              <p className="text-xs text-gray-400 mt-1">{customMessage.length}/20</p>
+            </div>
+
             <button
               onClick={downloadPoster}
               disabled={savingPoster}
@@ -277,7 +379,9 @@ export default function ApplyStatusPage() {
                   <div className="relative">
                     <p className="text-xs text-purple-600 mb-1">让我们一起在时光里</p>
                     <h2 className="text-xl font-bold text-gray-800 mb-2">望杏成林</h2>
-                    <p className="text-sm text-gray-600 mb-4">看见孩子，看见自己</p>
+                    <p className="text-sm text-gray-600 mb-2">看见孩子，看见自己</p>
+                    {/* 自定义文案 */}
+                    <p className="text-sm font-medium text-purple-700 mb-4">{customMessage}</p>
                     {/* 二维码 */}
                     <div className="mx-auto w-32 h-32 bg-white rounded-lg p-2 shadow-sm mb-4">
                       <img
