@@ -95,8 +95,14 @@ export default function ApplyStatusPage() {
 
   if (!data) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-amber-50 to-purple-50">
-        <div className="text-gray-400">申请不存在</div>
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-amber-50 to-purple-50">
+        <div className="text-gray-400 mb-6">申请不存在</div>
+        <a
+          href="/"
+          className="px-6 py-3 bg-purple-600 text-white rounded-full text-sm"
+        >
+          返回首页
+        </a>
       </div>
     );
   }
@@ -179,14 +185,21 @@ export default function ApplyStatusPage() {
               />
               <button
                 onClick={() => {
-                  navigator.clipboard.writeText(shareUrl);
-                  toast('链接已复制', 'success');
+                  try {
+                    navigator.clipboard.writeText(shareUrl);
+                    toast('链接已复制', 'success');
+                  } catch {
+                    toast('复制失败，请长按链接手动复制', 'error');
+                  }
                 }}
                 className="px-4 py-3 bg-purple-600 text-white rounded-lg text-sm"
               >
                 复制
               </button>
             </div>
+            <p className="text-xs text-gray-400 mt-2">
+              或长按上方输入框复制链接
+            </p>
           </div>
 
           {/* 邀请码（如果有） */}

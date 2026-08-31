@@ -606,6 +606,16 @@ export default function ComprehensiveReportPage() {
             </p>
           </div>
 
+          {/* 快速生成 vs 精挑细选说明 */}
+          <div className="bg-purple-50 rounded-2xl p-4">
+            <p className="text-sm text-purple-700 mb-2">
+              <strong>快速生成</strong>：AI 自动从你的记录中挑选最有分析价值的 3-10 条，适合想要快速获得洞察
+            </p>
+            <p className="text-sm text-purple-700">
+              <strong>精挑细选</strong>：你自己选择想要分析的记录，适合想要聚焦特定时期或事件
+            </p>
+          </div>
+
           {/* 记录统计 */}
           <div className="bg-white rounded-2xl p-4 shadow-sm">
             <div className="flex items-center justify-between">
@@ -867,15 +877,16 @@ export default function ComprehensiveReportPage() {
             {/* 周对比 */}
             {weeklyComparison && (
               <div className="mb-4 p-3 bg-blue-50 rounded-xl">
-                <h3 className="text-sm font-medium text-blue-600 mb-2">📈 本周 vs 上周</h3>
+                <h3 className="text-sm font-medium text-blue-600 mb-2">📈 选中记录的周期对比</h3>
+                <p className="text-xs text-gray-400 mb-3">基于选中记录的时间分布统计</p>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="text-center">
                     <div className="text-lg font-bold text-blue-600">{weeklyComparison.thisWeek.recordCount}</div>
-                    <div className="text-xs text-gray-500">本周记录</div>
+                    <div className="text-xs text-gray-500">前半段记录</div>
                   </div>
                   <div className="text-center">
                     <div className="text-lg font-bold text-gray-400">{weeklyComparison.lastWeek.recordCount}</div>
-                    <div className="text-xs text-gray-500">上周记录</div>
+                    <div className="text-xs text-gray-500">后半段记录</div>
                   </div>
                 </div>
                 <div className="text-center mt-2">
@@ -884,7 +895,7 @@ export default function ComprehensiveReportPage() {
                     weeklyComparison.trend === 'down' ? 'bg-red-100 text-red-600' :
                     'bg-gray-100 text-gray-600'
                   }`}>
-                    {weeklyComparison.trend === 'up' ? '📈 进步' :
+                    {weeklyComparison.trend === 'up' ? '📈 增长' :
                      weeklyComparison.trend === 'down' ? '📉 减少' : '➡️ 持平'}
                     {weeklyComparison.recordCountChange !== 0 && (
                       <span className="ml-1">

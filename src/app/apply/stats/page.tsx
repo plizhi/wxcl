@@ -92,17 +92,33 @@ function StatsPageContent() {
   }
 
   if (!stats) {
+    const shareCode = typeof window !== 'undefined' ? localStorage.getItem('shareCode') : null;
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-amber-50 to-purple-50 px-6">
         <div className="bg-white rounded-2xl p-8 shadow-xl max-w-sm w-full text-center">
           <h2 className="text-2xl font-bold text-gray-800 mb-4">推广数据中心</h2>
-          <p className="text-gray-500 mb-6">你还没有申请记录</p>
-          <Link
-            href="/apply"
-            className="block w-full py-3 bg-purple-600 text-white rounded-full text-center"
-          >
-            去申请
-          </Link>
+          {shareCode ? (
+            <>
+              <p className="text-gray-500 mb-2">你还没有分享数据</p>
+              <p className="text-sm text-gray-400 mb-6">分享邀请链接，获得邀请码</p>
+              <Link
+                href={`/apply/${shareCode}`}
+                className="block w-full py-3 bg-purple-600 text-white rounded-full text-center"
+              >
+                查看我的分享状态
+              </Link>
+            </>
+          ) : (
+            <>
+              <p className="text-gray-500 mb-6">你还没有申请记录</p>
+              <Link
+                href="/apply"
+                className="block w-full py-3 bg-purple-600 text-white rounded-full text-center"
+              >
+                去申请
+              </Link>
+            </>
+          )}
         </div>
       </div>
     );

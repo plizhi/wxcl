@@ -25,6 +25,11 @@ export default function DailyCarePage() {
 
   useEffect(() => {
     loadRecords();
+    // 检测是否跳过添加孩子
+    if (!currentChildId && localStorage.getItem('add_child_skipped') === 'true') {
+      localStorage.removeItem('add_child_skipped');
+      toast('请先添加孩子信息，以便更好地分析记录', 'info');
+    }
   }, []);
 
   async function loadRecords() {
@@ -75,7 +80,7 @@ export default function DailyCarePage() {
       const data = await res.json();
       if (data.extractions && data.extractions.length > 0) {
         setExtractions(data.extractions);
-        toast(`提取到 ${data.extractions.length} 个温暖时刻`, 'success');
+        toast(`已保存 ${data.savedCount || data.extractions.length} 个温暖时刻`, 'success');
       } else {
         toast('本次记录没有提取到新的温暖时刻', 'info');
         setShowNourishGuide(false);
