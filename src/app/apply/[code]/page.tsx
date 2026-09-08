@@ -28,7 +28,7 @@ export default function ApplyStatusPage() {
     };
   } | null>(null);
 
-  const [customMessage, setCustomMessage] = useState('一起看见孩子的内在结构');
+  const [customMessage, setCustomMessage] = useState('记录陪伴，看见成长');
 
   // 记录分享打开
   useEffect(() => {
@@ -123,24 +123,19 @@ export default function ApplyStatusPage() {
       ctx.fillText('望杏成林', 300, 100);
 
       ctx.fillStyle = '#6b7280';
-      ctx.font = '18px sans-serif';
-      ctx.fillText('让我们一起在时光里', 300, 140);
+      ctx.font = '16px sans-serif';
+      ctx.fillText('内在结构养育 · 亲子陪伴观察', 300, 140);
 
       // 绘制用户自定义文案
       ctx.fillStyle = '#7c3aed';
-      ctx.font = 'bold 24px sans-serif';
-      ctx.fillText(customMessage, 300, 200);
-
-      // 绘制描述
-      ctx.fillStyle = '#4b5563';
-      ctx.font = '16px sans-serif';
-      ctx.fillText('看见孩子，看见自己', 300, 240);
+      ctx.font = 'bold 22px sans-serif';
+      ctx.fillText(customMessage, 300, 195);
 
       // 绘制分隔线
       ctx.strokeStyle = '#e5e7eb';
       ctx.beginPath();
-      ctx.moveTo(100, 280);
-      ctx.lineTo(500, 280);
+      ctx.moveTo(100, 260);
+      ctx.lineTo(500, 260);
       ctx.stroke();
 
       // 绘制二维码
@@ -167,17 +162,17 @@ export default function ApplyStatusPage() {
       ctx.fillStyle = '#6b7280';
       ctx.font = '14px sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText('扫码体验望杏成林', 300, 560);
+      ctx.fillText('扫码开始你的亲子洞察', 300, 560);
 
       // 绘制邀请码
       if (hasInviteCode && data?.inviteCode) {
         ctx.fillStyle = '#059669';
         ctx.font = 'bold 20px sans-serif';
-        ctx.fillText(`邀请码：${data.inviteCode}`, 300, 620);
+        ctx.fillText(`我的邀请码：${data.inviteCode}`, 300, 620);
       } else {
         ctx.fillStyle = '#d97706';
         ctx.font = '16px sans-serif';
-        ctx.fillText('分享可得邀请码，与朋友一起成长', 300, 620);
+        ctx.fillText('分享给朋友，一起成长', 300, 620);
       }
 
       // 绘制底部
@@ -369,39 +364,41 @@ export default function ApplyStatusPage() {
 
           {/* 海报预览 */}
           {showPoster && (
-            <div className="mb-6 p-4 bg-gray-50 rounded-xl">
-              <div ref={posterRef} className="bg-white rounded-lg overflow-hidden">
-                {/* 海报内容 */}
-                <div className="relative bg-gradient-to-br from-purple-100 to-amber-50 p-6 text-center">
-                  <div className="absolute inset-0 opacity-10">
-                    <div className="w-full h-full bg-cover bg-center" style={{ backgroundImage: 'url(/media/apricot-forest-full.png)' }} />
-                  </div>
-                  <div className="relative">
-                    <p className="text-xs text-purple-600 mb-1">让我们一起在时光里</p>
-                    <h2 className="text-xl font-bold text-gray-800 mb-2">望杏成林</h2>
-                    <p className="text-sm text-gray-600 mb-2">看见孩子，看见自己</p>
-                    {/* 自定义文案 */}
-                    <p className="text-sm font-medium text-purple-700 mb-4">{customMessage}</p>
-                    {/* 二维码 */}
-                    <div className="mx-auto w-32 h-32 bg-white rounded-lg p-2 shadow-sm mb-4">
-                      <img
-                        src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(shareUrl)}`}
-                        alt="二维码"
-                        className="w-full h-full"
-                      />
+            <div className="mb-6 p-4 bg-gray-100 rounded-xl">
+              <p className="text-xs text-gray-500 mb-2 text-center">海报预览（真实尺寸 600×800 像素）</p>
+              <div className="max-w-full overflow-auto" style={{ maxHeight: '80vh' }}>
+                <div ref={posterRef} className="bg-white rounded-lg overflow-hidden" style={{ width: '600px', height: '800px' }}>
+                  {/* 海报内容 */}
+                  <div className="relative bg-gradient-to-br from-purple-100 to-amber-50 p-6 text-center" style={{ height: '800px' }}>
+                    <div className="absolute inset-0 opacity-10">
+                      <div className="w-full h-full bg-cover bg-center" style={{ backgroundImage: 'url(/media/apricot-forest-full.png)' }} />
                     </div>
-                    <p className="text-xs text-gray-400 mb-2">扫码体验望杏成林</p>
-                    {!hasInviteCode && (
-                      <p className="text-xs text-amber-600">分享可得邀请码，与朋友一起成长</p>
-                    )}
-                    {hasInviteCode && (
-                      <p className="text-xs text-green-600">邀请码：{data.inviteCode}</p>
-                    )}
+                    <div className="relative">
+                      <p className="text-xs text-gray-500 mb-1">内在结构养育 · 亲子陪伴观察</p>
+                      <h2 className="text-xl font-bold text-gray-800 mb-2">望杏成林</h2>
+                      {/* 自定义文案 */}
+                      <p className="text-sm font-medium text-purple-700 mb-4">{customMessage}</p>
+                      {/* 二维码 */}
+                      <div className="mx-auto w-32 h-32 bg-white rounded-lg p-2 shadow-sm mb-4">
+                        <img
+                          src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(shareUrl)}`}
+                          alt="二维码"
+                          className="w-full h-full"
+                        />
+                      </div>
+                      <p className="text-xs text-gray-500 mb-2">扫码开始你的亲子洞察</p>
+                      {!hasInviteCode && (
+                        <p className="text-xs text-amber-600">分享给朋友，一起成长</p>
+                      )}
+                      {hasInviteCode && (
+                        <p className="text-xs text-green-600">我的邀请码：{data.inviteCode}</p>
+                      )}
+                    </div>
+                    {/* 底部 */}
+                    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-r from-purple-600 to-purple-800 py-3 text-center">
+                      <p className="text-white text-xs">内在结构养育 · 亲子陪伴观察</p>
+                    </div>
                   </div>
-                </div>
-                {/* 底部 */}
-                <div className="bg-gradient-to-r from-purple-600 to-purple-800 py-3 text-center">
-                  <p className="text-white text-xs">内在结构养育 · 亲子陪伴观察</p>
                 </div>
               </div>
             </div>
