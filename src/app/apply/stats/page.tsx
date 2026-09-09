@@ -6,27 +6,28 @@ import Link from 'next/link';
 import { useToast } from '@/components/ui/toast';
 import { useAuth } from '@/context/AuthContext';
 
-interface Contributor {
-  id: string;
-  shareCode: string;
-  createdAt: string;
-  opens: number;
-}
-
-interface MyStats {
-  applyId: string;
-  shareCode: string;
-  totalOpens: number;
-  qualifiedContributors: number;
-  contributorList: Contributor[];
-}
+type Period = 'week' | 'month';
+type RankingType = 'opens' | 'users';
 
 interface RankingItem {
   rank: number;
-  id: string;
   shareCode: string;
   totalOpens: number;
-  qualifiedCount: number;
+  newUsers: number;
+}
+
+interface RankingResponse {
+  period: string;
+  type: string;
+  periodStart: string;
+  periodEnd: string;
+  ranking: RankingItem[];
+  myStats: {
+    rank: number;
+    shareCode: string;
+    totalOpens: number;
+    newUsers: number;
+  } | null;
 }
 
 function StatsPageContent() {
@@ -35,19 +36,19 @@ function StatsPageContent() {
   const { user, isLoading: authLoading } = useAuth();
 
   const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState<{
-    myStats: MyStats;
-    ranking: RankingItem[];
-    myRanking: number | null;
-  } | null>(null);
+  const [period, setPeriod] = useState<Period>('week');
+  const [type, setType] = useState<RankingType>('opens');
+  const [data, setData] = useState<RankingResponse | null>(null);
 
-  async function fetchStats(phone: string) {
+  async function fetchRanking(p: Period, t: RankingType, phone?: string) {
     try {
-      const res = await fetch(`/api/apply/stats?phone=${phone}`);
+      const params = new URLSearchParams({ period: p, type: t });
+      if (phone) params.append('phone', phone);
+      const res = await fetch(`/api/apply/ranking?${params}`);
       const result = await res.json();
 
       if (result.code === 0) {
-        setStats(result.data);
+        setData(result.data);
       } else {
         toast(result.message || '获取数据失败', 'error');
       }
@@ -59,12 +60,15 @@ function StatsPageContent() {
   }
 
   useEffect(() => {
-    if (!authLoading && user?.phone) {
-      fetchStats(user.phone);
-    } else if (!authLoading && !user?.phone) {
-      setLoading(false);
+    if (!authLoading) {
+      if (user?.phone) {
+        fetchRanking(period, type, user.phone);
+      } else {
+        fetchRanking(period, type);
+        setLoading(false);
+      }
     }
-  }, [user, authLoading]);
+  }, [user, authLoading, period, type]);
 
   if (authLoading || loading) {
     return (
@@ -91,8 +95,9 @@ function StatsPageContent() {
     );
   }
 
-  if (!stats) {
-    const shareCode = typeof window !== 'undefined' ? localStorage.getItem('shareCode') : null;
+  const shareCode = typeof window !== 'undefined' ? localStorage.getItem('shareCode') : null;
+
+  if (!data && !loading) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-amber-50 to-purple-50 px-6">
         <div className="bg-white rounded-2xl p-8 shadow-xl max-w-sm w-full text-center">
@@ -138,92 +143,168 @@ function StatsPageContent() {
       </div>
 
       <div className="max-w-2xl mx-auto px-6 py-6 space-y-6">
-        {/* 我的数据 */}
-        <div className="bg-white rounded-2xl p-6 shadow-lg">
-          <h2 className="text-lg font-bold text-gray-800 mb-4">我的推广数据</h2>
-
-          <div className="grid grid-cols-2 gap-4 mb-6">
-            <div className="bg-purple-50 rounded-xl p-4 text-center">
-              <p className="text-3xl font-bold text-purple-600">{stats.myStats.totalOpens}</p>
-              <p className="text-xs text-gray-500 mt-1">分享被打开</p>
+        {/* 筛选器 */}
+        <div className="bg-white rounded-2xl p-4 shadow-lg">
+          <div className="flex gap-2 mb-4">
+            {/* 周期切换 */}
+            <div className="flex bg-gray-100 rounded-full p-1 flex-1">
+              <button
+                onClick={() => setPeriod('week')}
+                className={`flex-1 py-2 text-sm rounded-full transition-colors ${
+                  period === 'week'
+                    ? 'bg-purple-600 text-white font-medium'
+                    : 'text-gray-600 hover:text-gray-800'
+                }`}
+              >
+                周榜
+              </button>
+              <button
+                onClick={() => setPeriod('month')}
+                className={`flex-1 py-2 text-sm rounded-full transition-colors ${
+                  period === 'month'
+                    ? 'bg-purple-600 text-white font-medium'
+                    : 'text-gray-600 hover:text-gray-800'
+                }`}
+              >
+                月榜
+              </button>
             </div>
-            <div className="bg-amber-50 rounded-xl p-4 text-center">
-              <p className="text-3xl font-bold text-amber-600">{stats.myStats.qualifiedContributors}</p>
-              <p className="text-xs text-gray-500 mt-1">贡献的申请</p>
+            {/* 类型切换 */}
+            <div className="flex bg-gray-100 rounded-full p-1 flex-1">
+              <button
+                onClick={() => setType('opens')}
+                className={`flex-1 py-2 text-sm rounded-full transition-colors ${
+                  type === 'opens'
+                    ? 'bg-amber-500 text-white font-medium'
+                    : 'text-gray-600 hover:text-gray-800'
+                }`}
+              >
+                打开数
+              </button>
+              <button
+                onClick={() => setType('users')}
+                className={`flex-1 py-2 text-sm rounded-full transition-colors ${
+                  type === 'users'
+                    ? 'bg-amber-500 text-white font-medium'
+                    : 'text-gray-600 hover:text-gray-800'
+                }`}
+              >
+                新用户
+              </button>
             </div>
           </div>
 
-          {stats.myRanking && (
-            <div className="bg-green-50 rounded-xl p-4 text-center mb-4">
-              <p className="text-sm text-gray-500">你的排名</p>
-              <p className="text-2xl font-bold text-green-600">第 {stats.myRanking} 名</p>
-            </div>
+          {/* 周期说明 */}
+          {data && (
+            <p className="text-xs text-gray-400 text-center">
+              {new Date(data.periodStart).toLocaleDateString('zh-CN')}
+              {' ~ '}
+              {new Date(data.periodEnd).toLocaleDateString('zh-CN')}
+            </p>
           )}
-
-          <div className="space-y-2">
-            <h3 className="text-sm font-medium text-gray-600">我邀请的用户</h3>
-            {stats.myStats.contributorList.length === 0 ? (
-              <p className="text-sm text-gray-400 text-center py-4">暂无邀请用户</p>
-            ) : (
-              <div className="space-y-2 max-h-60 overflow-y-auto">
-                {stats.myStats.contributorList.map((c, i) => (
-                  <div key={c.id} className="flex items-center justify-between bg-gray-50 rounded-lg px-4 py-3">
-                    <div className="flex items-center gap-3">
-                      <span className="w-6 h-6 rounded-full bg-purple-100 flex items-center justify-center text-xs text-purple-600">
-                        {i + 1}
-                      </span>
-                      <span className="text-sm text-gray-600">
-                        用户 {c.shareCode.slice(-4)}
-                      </span>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-sm font-medium text-purple-600">{c.opens} 打开</p>
-                      <p className="text-xs text-gray-400">
-                        {new Date(c.createdAt).toLocaleDateString()}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
         </div>
+
+        {/* 我的排名 */}
+        {data?.myStats && (
+          <div className="bg-gradient-to-r from-green-500 to-emerald-500 rounded-2xl p-6 shadow-lg text-white">
+            <p className="text-sm opacity-80 mb-1">
+              {period === 'week' ? '本周' : '本月'}{type === 'opens' ? '打开数' : '新用户'}排名
+            </p>
+            <div className="flex items-end gap-4">
+              <p className="text-5xl font-bold">
+                {data.myStats.rank > 0 ? `第 ${data.myStats.rank} 名` : '未上榜'}
+              </p>
+              <div className="pb-2">
+                <p className="text-2xl font-bold">
+                  {type === 'opens' ? data.myStats.totalOpens : data.myStats.newUsers}
+                </p>
+                <p className="text-sm opacity-80">
+                  {type === 'opens' ? '打开' : '新用户'}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* 排行榜 */}
         <div className="bg-white rounded-2xl p-6 shadow-lg">
-          <h2 className="text-lg font-bold text-gray-800 mb-4">推广排行榜</h2>
+          <h2 className="text-lg font-bold text-gray-800 mb-4">
+            {period === 'week' ? '本周' : '本月'}排行榜
+            <span className="text-sm font-normal text-gray-400 ml-2">
+              ({type === 'opens' ? '按打开数' : '按新用户数'})
+            </span>
+          </h2>
 
-          <div className="space-y-2">
-            {stats.ranking.map((item, i) => {
-              const isMe = item.id === stats.myStats.applyId;
-              return (
-                <div
-                  key={item.id}
-                  className={`flex items-center justify-between rounded-xl px-4 py-3 ${
-                    isMe ? 'bg-green-50 border border-green-200' : 'bg-gray-50'
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
-                      i === 0 ? 'bg-yellow-400 text-white' :
-                      i === 1 ? 'bg-gray-300 text-white' :
-                      i === 2 ? 'bg-amber-300 text-white' :
-                      'bg-gray-200 text-gray-600'
-                    }`}>
-                      {i + 1}
-                    </span>
-                    <span className={`text-sm ${isMe ? 'text-green-600 font-medium' : 'text-gray-600'}`}>
-                      用户 {item.shareCode.slice(-4)} {isMe ? '(我)' : ''}
-                    </span>
+          {data?.ranking.length === 0 ? (
+            <p className="text-center text-gray-400 py-8">暂无数据</p>
+          ) : (
+            <div className="space-y-2">
+              {data?.ranking.map((item) => {
+                const isMe = data.myStats && item.rank === data.myStats.rank &&
+                  item.shareCode === data.myStats.shareCode;
+                return (
+                  <div
+                    key={`${item.rank}-${item.shareCode}`}
+                    className={`flex items-center justify-between rounded-xl px-4 py-3 ${
+                      isMe ? 'bg-green-50 border border-green-200' : 'bg-gray-50'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${
+                        item.rank === 1 ? 'bg-yellow-400 text-white' :
+                        item.rank === 2 ? 'bg-gray-300 text-white' :
+                        item.rank === 3 ? 'bg-amber-300 text-white' :
+                        'bg-gray-200 text-gray-600'
+                      }`}>
+                        {item.rank}
+                      </span>
+                      <span className={`text-sm ${isMe ? 'text-green-600 font-medium' : 'text-gray-600'}`}>
+                        {item.shareCode.slice(-4)}
+                        {isMe && <span className="ml-1 text-xs">(我)</span>}
+                      </span>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm font-medium text-purple-600">
+                        {type === 'opens' ? `${item.totalOpens} 打开` : `${item.newUsers} 用户`}
+                      </p>
+                      {type === 'opens' && item.newUsers > 0 && (
+                        <p className="text-xs text-gray-400">{item.newUsers} 新用户</p>
+                      )}
+                      {type === 'users' && item.totalOpens > 0 && (
+                        <p className="text-xs text-gray-400">{item.totalOpens} 打开</p>
+                      )}
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <p className="text-sm font-medium text-purple-600">{item.totalOpens} 打开</p>
-                    <p className="text-xs text-gray-400">{item.qualifiedCount} 贡献</p>
-                  </div>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* 激励说明 */}
+        <div className="bg-white rounded-2xl p-6 shadow-lg">
+          <h2 className="text-lg font-bold text-gray-800 mb-4">激励规则</h2>
+          <div className="space-y-3 text-sm">
+            <div className="flex items-start gap-3">
+              <span className="w-6 h-6 rounded-full bg-yellow-100 text-yellow-600 flex items-center justify-center text-xs font-bold flex-shrink-0">周</span>
+              <div>
+                <p className="text-gray-600">
+                  <span className="font-medium text-purple-600">周榜 Top1</span>：1个邀请码 + 电子勋章
+                </p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3">
+              <span className="w-6 h-6 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center text-xs font-bold flex-shrink-0">月</span>
+              <div>
+                <p className="text-gray-600">
+                  <span className="font-medium text-purple-600">月榜 Top3</span>：各1个邀请码
+                </p>
+              </div>
+            </div>
           </div>
+          <p className="text-xs text-gray-400 mt-4">
+            统计周期：周榜为上周一至周日，月榜为上月1日至最后一日
+          </p>
         </div>
       </div>
     </div>

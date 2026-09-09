@@ -1,0 +1,8 @@
+# 望杏成林 V2 - 定时任务配置
+# 安装方法: crontab crontab.example 或复制到 /etc/cron.d/wxcl-reward
+
+# 每周一 00:05 发放周榜激励
+5 0 * * 1 curl -s "http://localhost:3008/api/cron/reward?type=week&secret=YOUR_CRON_SECRET" >> /var/log/wxcl-reward-week.log 2>&1
+
+# 每月 1 日 00:05 发放月榜激励
+5 0 1 * * curl -s "http://localhost:3008/api/cron/reward?type=month&secret=YOUR_CRON_SECRET" >> /var/log/wxcl-reward-month.log 2>&1

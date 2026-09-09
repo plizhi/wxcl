@@ -64,6 +64,7 @@ model User {
   updatedAt  DateTime  @updatedAt @map("updated_at") @db.Timestamp
 
   children   Child[]
+  apply      Apply?
 
   @@map("users")
 }
@@ -312,9 +313,14 @@ model Apply {
   inviteCode  String?   @unique @map("invite_code") @db.VarChar(8)
   inviteUsedAt DateTime? @map("invite_used_at") @db.Timestamp
   inviteExpiresAt DateTime? @map("invite_expires_at") @db.Timestamp
+  userId      String?   @unique @map("user_id") @db.Uuid  // 关联正式用户
+  activatedAt DateTime? @map("activated_at") @db.Timestamp
   createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamp
 
+  user        User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+
   @@index([referrerId])
+  @@index([userId])
   @@map("applies")
 }
 
@@ -328,4 +334,20 @@ model ShareLog {
 
   @@index([applyId])
   @@map("share_logs")
+}
+
+// 激励发放记录
+model ApplyReward {
+  id         String   @id @default(cuid())
+  applyId    String   @map("apply_id") @db.Uuid
+  period     String   @db.VarChar(10)  // "week" | "month"
+  type       String   @db.VarChar(10)  // "opens" | "users"
+  rank       Int
+  rewardCode String?  @map("reward_code") @db.VarChar(8)
+  medal      Boolean  @default(false)  // 是否发放电子勋章
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamp
+
+  @@unique([applyId, period, type])
+  @@index([applyId])
+  @@map("apply_rewards")
 }
