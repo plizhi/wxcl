@@ -1,149 +1,79 @@
 # 望杏成林 V2 - 开发进度记录
 
-## 2026-09-09 邀请码体系与排行榜
-
-### 核心设计：身份体系与邀请码机制
+## 2026-09-10 用户时长机制完成
 
 ---
 
-## 一、身份体系
+## 一、用户时长体系
 
-### 预注册用户（分享者）
-- **获得方式**：扫码 + 手机号注册
-- **数据存储**：Apply 表
-- **权益**：
-  - ❌ 无法使用应用核心功能（陪伴记录、滋养时刻等）
-  - ✅ 可以看到分享状态
-  - ✅ 可以保存/分享海报
-- **目标**：通过分享达成 10+3 条件
+### 设计规则
 
-### 正式用户
-- **获得方式**：邀请码激活
-- **数据存储**：User 表（通过 Apply.userId 关联）
-- **权益**：
-  - ✅ 完整使用所有功能
-  - ✅ 可以成为新的分享者
+| 项目 | 说明 |
+|-----|------|
+| 新用户注册 | 获得 6 个月时长 |
+| 时长上限 | 24 个月 |
+| 老用户 | 一次性给 24 个月 |
 
----
+### 延长规则
 
-## 二、邀请码机制
-
-### 邀请码的双重角色
-
-| 场景 | 对谁 | 作用 |
+| 行为 | 目标 | 奖励 |
 |-----|------|-----|
-| 注册时 | 新用户 | 注册凭证 |
-| 激活时 | 预注册用户 | 功能激活码 |
+| 分享海报下载 | 3次/月 | +1个月 |
+| 邀请好友注册 | 1人/月 | +3个月 |
+| 提交反馈 | 3次/月 | +1个月 |
 
-### 10+3 条件
-- 10：分享被打开次数
-- 3：分享后新用户申请数（需达到10+打开）
+### 冻结与解冻
 
-### A 的路径（示例）
-```
-预注册用户（扫码注册）
-    ↓
-分享给10人打开 + 3人申请（每人需10+打开）
-    ↓
-获得邀请码（激活码）
-    ↓
-用邀请码激活 → 正式用户
-    ↓
-解锁完整功能
-```
+| 状态 | 说明 |
+|-----|------|
+| 超时冻结 | 到期后账号冻结，无法使用核心功能 |
+| 解冻方式 | 邀请1人注册即可解冻，获得6个月时长 |
 
 ---
 
-## 三、排行榜与激励体系
+## 二、数据模型
 
-### 排行榜设计
-
-**入口**：推广数据中心 `/apply/stats`
-
-**周期**：周榜 + 月榜
-
-**类型**：
-1. 分享打开数排行榜
-2. 新用户数排行榜（referrer 带来的激活用户数）
-
-### 激励体系
-
-| 榜单 | 周期 | 排名 | 激励 |
-|-----|------|-----|------|
-| 分享打开 Top1 | 周榜 | 1 | 1个邀请码 + 电子勋章 |
-| 新用户 Top1 | 周榜 | 1 | 1个邀请码 + 电子勋章 |
-| 分享打开 Top3 | 月榜 | 1-3 | 各1个邀请码 |
-| 新用户 Top3 | 月榜 | 1-3 | 各1个邀请码 |
-
-**说明**：
-- 邀请码可送给朋友，朋友直接成为正式用户
-- 电子勋章：荣誉激励（ApplyReward 表 medal 字段）
-
----
-
-## 四、数据模型
-
-### Apply 表扩展 ✅
+### User 表扩展
 ```prisma
-model Apply {
-  id            String    @id
-  phone         String    @unique
-  shareCode     String    @unique
-  status        String    // pending/invite_ready/activated
-  referrerId    String?   // 推荐人 Apply.id
-  inviteCode    String?   @unique  // 6位邀请码
-  inviteUsedAt  DateTime?
-  inviteExpiresAt DateTime?
-  userId        String?   @unique  // 关联 User（激活后）
-  activatedAt   DateTime? // 激活时间
-  createdAt     DateTime
+model User {
+  expireAt    DateTime?  // 到期时间，null 表示无限制
 }
 ```
 
-### ApplyReward 表 ✅（新增）
+### UserActivity 表（新增）
 ```prisma
-model ApplyReward {
-  id         String   @id
-  applyId    String   // Apply.id
-  period     String   // "week" | "month"
-  type       String   // "opens" | "users"
-  rank       Int
-  rewardCode String?  // 发放的邀请码
-  medal      Boolean  // 是否发放电子勋章
-  createdAt  DateTime
+model UserActivity {
+  id        String   @id
+  userId    String
+  type      String   // "share" | "invite" | "feedback"
+  month     String   // "2026-09" 格式
+  count     Int      @default(1)
 }
 ```
 
 ---
 
-## 五、API 实现
+## 三、API 实现
 
-### 排行榜 API ✅
-- `GET /api/apply/ranking?period=week|month&type=opens|users&phone=xxx`
-- 返回：排行榜列表 + 当前用户排名 + 周期时间范围
-
-### 激励发放 Cron API ✅
-- `GET /api/cron/reward?type=week|month|both&secret=xxx`
-- 每周一 00:05 和每月 1 日 00:05 触发
-- 检查并发放激励（生成邀请码、记录 ApplyReward）
-
-### 激活 API ✅
-- `POST /api/apply/verify-invite/[code]`
-- 验证邀请码有效性
-- 创建/关联 User
-- 创建/更新 Apply（status=activated, userId, activatedAt, referrerId）
+| API | 说明 |
+|-----|------|
+| `GET /api/user/expiry` | 获取时长状态 |
+| `POST /api/user/activity` | 记录行为（share/invite/feedback） |
+| `GET /api/cron/reward` | 激励发放（定时任务触发） |
 
 ---
 
-## 六、数据库迁移
+## 四、前端入口
 
-```bash
-npx prisma db push
-```
+| 位置 | 内容 |
+|-----|------|
+| 首页 `/(tab)/home` | 时长状态提示 + 推广数据中心入口 |
+| 推广数据中心 `/apply/stats` | 个人数据 + 排行榜 + 激励规则 |
+| 我的页面 `/(tab)/profile` | 意见反馈入口 |
 
 ---
 
-## 七、定时任务配置
+## 五、定时任务配置
 
 ```bash
 # crontab -e 添加：
@@ -156,28 +86,56 @@ npx prisma db push
 
 ---
 
+## 六、老用户迁移
+
+```bash
+npx tsx scripts/migrate-user-expiry.ts
+```
+
+---
+
+## 七、邀请码体系
+
+### 10+3 条件
+- 10：分享被打开次数
+- 3：分享后新用户申请数（需达到10+打开）
+
+### 排行榜与激励
+
+| 榜单 | 周期 | 排名 | 激励 |
+|-----|------|-----|------|
+| 分享打开 Top1 | 周榜 | 1 | 1个邀请码 + 电子勋章 |
+| 新用户 Top1 | 周榜 | 1 | 1个邀请码 + 电子勋章 |
+| 分享打开 Top3 | 月榜 | 1-3 | 各1个邀请码 |
+| 新用户 Top3 | 月榜 | 1-3 | 各1个邀请码 |
+
+---
+
 ## 八、待实现功能
 
 - [ ] 电子勋章展示（前端 UI）
 - [ ] 邀请码过期提醒通知
-- [ ] 推广数据中心数据导出
 - [ ] 恶意刷量防护（IP 限流）
 
 ---
 
 ## 九、相关文件
 
-### API 路由
-- `/api/apply` - 申请相关
-- `/api/apply/ranking` - 排行榜 API（新建）
-- `/api/apply/stats` - 推广统计
-- `/api/apply/verify-invite/[code]` - 邀请码激活
-- `/api/cron/reward` - 激励发放（新建）
+### 核心逻辑
+- `src/lib/user-expiry.ts` - 时长检查、延长、解冻逻辑
+- `src/lib/apply-reward.ts` - 激励发放逻辑
+
+### API
+- `/api/user/expiry` - 时长状态
+- `/api/user/activity` - 行为记录
+- `/api/apply/ranking` - 排行榜
+- `/api/cron/reward` - 激励发放
 
 ### 页面
+- `/(tab)/home/page.tsx` - 首页（时长提示 + 推广入口）
+- `/(tab)/profile/page.tsx` - 我的页面（意见反馈）
+- `/apply/stats` - 推广数据中心
 - `/apply/[code]` - 分享状态页
-- `/apply/stats` - 推广数据中心（已改造）
 
-### 核心文件
-- `prisma/schema.prisma` - Apply、ApplyReward 模型
-- `src/lib/apply-reward.ts` - 激励发放逻辑（新建）
+### 脚本
+- `scripts/migrate-user-expiry.ts` - 老用户迁移
