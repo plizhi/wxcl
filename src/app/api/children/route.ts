@@ -1,14 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getAuthFromRequest } from "@/lib/auth-utils";
+import { checkNotExpired } from "@/lib/auth-utils";
 import { withErrorHandler, errors } from "@/lib/api-error";
 
 // GET /api/children - 获取用户的孩子列表
 export const GET = withErrorHandler(async (req: NextRequest) => {
-  const auth = getAuthFromRequest(req);
-  if (!auth) {
-    throw errors.unauthorized();
+  const authOrRes = await checkNotExpired(req);
+  if (authOrRes instanceof NextResponse) {
+    return authOrRes;
   }
+  const auth = authOrRes;
 
   const children = await prisma.child.findMany({
     where: { userId: auth.userId },
@@ -26,10 +27,11 @@ export const GET = withErrorHandler(async (req: NextRequest) => {
 
 // POST /api/children - 创建孩子档案
 export const POST = withErrorHandler(async (req: NextRequest) => {
-  const auth = getAuthFromRequest(req);
-  if (!auth) {
-    throw errors.unauthorized();
+  const authOrRes = await checkNotExpired(req);
+  if (authOrRes instanceof NextResponse) {
+    return authOrRes;
   }
+  const auth = authOrRes;
 
   const { name, gender, birthDate } = await req.json();
 
@@ -58,10 +60,11 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
 
 // PUT /api/children - 更新孩子档案
 export const PUT = withErrorHandler(async (req: NextRequest) => {
-  const auth = getAuthFromRequest(req);
-  if (!auth) {
-    throw errors.unauthorized();
+  const authOrRes = await checkNotExpired(req);
+  if (authOrRes instanceof NextResponse) {
+    return authOrRes;
   }
+  const auth = authOrRes;
 
   const { id, name, gender, birthDate } = await req.json();
 
@@ -100,10 +103,11 @@ export const PUT = withErrorHandler(async (req: NextRequest) => {
 
 // DELETE /api/children - 删除孩子档案
 export const DELETE = withErrorHandler(async (req: NextRequest) => {
-  const auth = getAuthFromRequest(req);
-  if (!auth) {
-    throw errors.unauthorized();
+  const authOrRes = await checkNotExpired(req);
+  if (authOrRes instanceof NextResponse) {
+    return authOrRes;
   }
+  const auth = authOrRes;
 
   const id = req.nextUrl.searchParams.get("id");
   if (!id) {

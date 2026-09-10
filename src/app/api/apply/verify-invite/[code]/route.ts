@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { apiSuccess, apiError } from '@/lib/response';
 import { withErrorHandler } from '@/lib/api-error';
+import { initializeNewUser, unfreezeByInvite, recordActivity } from '@/lib/user-expiry';
 import crypto from 'crypto';
 
 function generateShareCode(): string {
@@ -50,6 +51,7 @@ export const POST = withErrorHandler(async (req: NextRequest, { params }: { para
   let user = await prisma.user.findUnique({
     where: { phone },
   });
+  let isNewUser = false;
 
   if (!user) {
     // 创建新用户
@@ -59,6 +61,7 @@ export const POST = withErrorHandler(async (req: NextRequest, { params }: { para
         nickname: '用户',
       },
     });
+    isNewUser = true;
   }
 
   // 查找或创建该用户的 Apply（用于记录激活状态）
@@ -89,6 +92,17 @@ export const POST = withErrorHandler(async (req: NextRequest, { params }: { para
         referrerId: inviterApply.id,
       },
     });
+  }
+
+  // 新用户初始化时长
+  if (isNewUser) {
+    await initializeNewUser(user.id);
+  }
+
+  // 给邀请者记录 invite 行为
+  if (inviterApply.userId) {
+    await unfreezeByInvite(inviterApply.userId);
+    await recordActivity(inviterApply.userId, 'invite');
   }
 
   return apiSuccess({

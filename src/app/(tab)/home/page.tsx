@@ -5,27 +5,50 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { dailyCareApi, nourishmentApi } from '@/lib/api';
 
+interface ExpiryStatus {
+  expired: boolean;
+  remainingDays: number | null;
+}
+
 export default function HomePage() {
   const router = useRouter();
   const { user, fetchUserInfo } = useAuth();
   const [latestRecord, setLatestRecord] = useState<any>(null);
   const [latestNourishment, setLatestNourishment] = useState<any>(null);
   const [latestVenting, setLatestVenting] = useState<any>(null);
+  const [expiryStatus, setExpiryStatus] = useState<ExpiryStatus | null>(null);
 
   useEffect(() => {
     fetchUserInfo();
     loadLatestData();
+    loadExpiryStatus();
   }, [fetchUserInfo]);
 
   async function loadLatestData() {
     try {
-      // 加载陪伴记录
       const recordsData = await dailyCareApi.getRecords(0, 1);
       if (recordsData.records && recordsData.records.length > 0) {
         setLatestRecord(recordsData.records[0]);
       }
     } catch (e) {
       console.error('加载数据失败', e);
+    }
+  }
+
+  async function loadExpiryStatus() {
+    try {
+      const res = await fetch('/api/user/expiry', {
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('token') || ''}` },
+      });
+      const data = await res.json();
+      if (data.code === 0) {
+        setExpiryStatus({
+          expired: data.data.expired,
+          remainingDays: data.data.remainingDays,
+        });
+      }
+    } catch (e) {
+      console.error('加载时长状态失败', e);
     }
   }
 
@@ -55,6 +78,48 @@ export default function HomePage() {
             看见孩子，看见自己
           </p>
         </div>
+
+        {/* 时长状态提示 */}
+        {expiryStatus && (
+          <div className={`mb-4 p-3 rounded-xl ${expiryStatus.expired ? 'bg-red-50 border border-red-200' : expiryStatus.remainingDays !== null && expiryStatus.remainingDays <= 7 ? 'bg-amber-50 border border-amber-200' : 'hidden'}`}>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                {expiryStatus.expired ? (
+                  <>
+                    <span className="text-red-500">⚠️</span>
+                    <span className="text-sm text-red-600">账号已冻结</span>
+                  </>
+                ) : (
+                  <>
+                    <span className="text-amber-500">⏰</span>
+                    <span className="text-sm text-amber-600">剩余 {expiryStatus.remainingDays} 天</span>
+                  </>
+                )}
+              </div>
+              <button
+                onClick={() => router.push('/apply/stats')}
+                className="text-xs text-purple-600"
+              >
+                延长时间 →
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* 推广数据中心入口 */}
+        <button
+          onClick={() => router.push('/apply/stats')}
+          className="w-full mb-4 bg-gradient-to-r from-purple-50 to-pink-50 rounded-xl p-4 text-left border border-purple-100"
+        >
+          <div className="flex items-center gap-3">
+            <span className="text-xl">📈</span>
+            <div className="flex-1">
+              <p className="text-sm font-medium text-purple-700">推广数据中心</p>
+              <p className="text-xs text-purple-400">分享邀请码，获得更多权益</p>
+            </div>
+            <span className="text-purple-400">→</span>
+          </div>
+        </button>
 
         {/* 三份报告卡片 */}
         <div className="space-y-4">

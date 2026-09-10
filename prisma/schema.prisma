@@ -60,11 +60,13 @@ model User {
   parentRole String?   @map("parent_role") @db.VarChar(20)
   lastLoginAt DateTime? @map("last_login_at") @db.Timestamp
   lastLoginIp String?   @map("last_login_ip") @db.VarChar(50)
+  expireAt   DateTime?  @map("expire_at") @db.Timestamp  // 到期时间，null表示无限制
   createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamp
   updatedAt  DateTime  @updatedAt @map("updated_at") @db.Timestamp
 
-  children   Child[]
-  apply      Apply?
+  children     Child[]
+  apply       Apply?
+  activities   UserActivity[]
 
   @@map("users")
 }
@@ -300,6 +302,24 @@ model ParentReflection {
 
   @@index([userId])
   @@map("parent_reflections")
+}
+
+// ========== 用户行为记录 ==========
+
+model UserActivity {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id") @db.Uuid
+  type      String   @db.VarChar(20)  // "share" | "invite" | "feedback"
+  month     String   @db.VarChar(7)    // "2026-09" 格式
+  count     Int      @default(1)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamp
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, type, month])
+  @@index([userId])
+  @@index([month])
+  @@map("user_activities")
 }
 
 // ========== 邀请申请 ==========

@@ -189,6 +189,17 @@ export default function ApplyStatusPage() {
       link.href = canvas.toDataURL('image/png');
       link.click();
       toast('海报已保存', 'success');
+
+      // 记录分享行为（静默失败）
+      fetch('/api/user/activity', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'share' }),
+      }).then(res => res.json()).then(result => {
+        if (result.code === 0 && result.data?.extended) {
+          toast('恭喜！已延长1个月使用时长', 'success');
+        }
+      }).catch(() => {});
     } catch (e) {
       console.error('生成海报失败', e);
       toast('生成海报失败', 'error');
@@ -365,37 +376,37 @@ export default function ApplyStatusPage() {
           {/* 海报预览 */}
           {showPoster && (
             <div className="mb-6 p-4 bg-gray-100 rounded-xl">
-              <p className="text-xs text-gray-500 mb-2 text-center">海报预览（真实尺寸 600×800 像素）</p>
-              <div className="max-w-full overflow-auto" style={{ maxHeight: '80vh' }}>
-                <div ref={posterRef} className="bg-white rounded-lg overflow-hidden" style={{ width: '600px', height: '800px' }}>
+              <p className="text-xs text-gray-500 mb-2 text-center">海报预览</p>
+              <div className="flex justify-center">
+                <div className="relative bg-white rounded-lg overflow-hidden shadow-lg" style={{ width: '300px', height: '400px' }}>
                   {/* 海报内容 */}
-                  <div className="relative bg-gradient-to-br from-purple-100 to-amber-50 p-6 text-center" style={{ height: '800px' }}>
+                  <div className="absolute inset-0 bg-gradient-to-br from-purple-100 to-amber-50 p-3 text-center">
                     <div className="absolute inset-0 opacity-10">
                       <div className="w-full h-full bg-cover bg-center" style={{ backgroundImage: 'url(/media/apricot-forest-full.png)' }} />
                     </div>
-                    <div className="relative">
+                    <div className="relative h-full flex flex-col items-center justify-center">
                       <p className="text-xs text-gray-500 mb-1">内在结构养育 · 亲子陪伴观察</p>
-                      <h2 className="text-xl font-bold text-gray-800 mb-2">望杏成林</h2>
+                      <h2 className="text-sm font-bold text-gray-800 mb-2">望杏成林</h2>
                       {/* 自定义文案 */}
-                      <p className="text-sm font-medium text-purple-700 mb-4">{customMessage}</p>
+                      <p className="text-xs font-medium text-purple-700 mb-2">{customMessage}</p>
                       {/* 二维码 */}
-                      <div className="mx-auto w-32 h-32 bg-white rounded-lg p-2 shadow-sm mb-4">
+                      <div className="mx-auto w-16 h-16 bg-white rounded-lg p-1 shadow-sm mb-2">
                         <img
                           src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(shareUrl)}`}
                           alt="二维码"
                           className="w-full h-full"
                         />
                       </div>
-                      <p className="text-xs text-gray-500 mb-2">扫码开始你的亲子洞察</p>
+                      <p className="text-xs text-gray-500 mb-1">扫码开始你的亲子洞察</p>
                       {!hasInviteCode && (
                         <p className="text-xs text-amber-600">分享给朋友，一起成长</p>
                       )}
                       {hasInviteCode && (
-                        <p className="text-xs text-green-600">我的邀请码：{data.inviteCode}</p>
+                        <p className="text-xs text-green-600">邀请码：{data.inviteCode}</p>
                       )}
                     </div>
                     {/* 底部 */}
-                    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-r from-purple-600 to-purple-800 py-3 text-center">
+                    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-r from-purple-600 to-purple-800 py-2 text-center">
                       <p className="text-white text-xs">内在结构养育 · 亲子陪伴观察</p>
                     </div>
                   </div>
