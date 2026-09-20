@@ -12,10 +12,11 @@ interface BindParams {
 
 /**
  * 验证 nzyy 跳转 token
+ * nzyy 提供 /api/portal/verify-bind 接口
  */
 async function verifyNzyyToken(phone: string, token: string): Promise<boolean> {
   try {
-    const res = await fetch(`${NZYY_API_URL}/verify-bind`, {
+    const res = await fetch(`${NZYY_API_URL}/portal/verify-bind`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ phone, token }),
@@ -61,10 +62,9 @@ export const POST = async (req: NextRequest) => {
         },
       });
     } else {
-      // 已存在用户，更新状态（如果当前是 organic 或非 pending）
+      // 已存在用户，更新状态
       if (user.status === 'active' && user.source === 'organic') {
-        // 已经是正式用户，不覆盖
-        // 生成 token 返回
+        // 已经是正式用户，不覆盖，直接返回 token
         const jwt = generateToken(user.id, user.phone || '');
         return NextResponse.json({ code: 0, message: 'success', data: { token: jwt, isNew: false } });
       }
