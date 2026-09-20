@@ -69,7 +69,7 @@ export const POST = async (req: NextRequest) => {
       // 已存在用户，更新状态
       if (user.status === 'active' && user.source === 'organic') {
         // 已经是正式用户，不覆盖，直接返回 token
-        const jwt = generateToken(user.id, user.phone || '');
+        const jwt = generateToken({ userId: user.id, phone: user.phone || '' });
         return NextResponse.json({
           code: 0,
           message: 'success',
@@ -88,7 +88,7 @@ export const POST = async (req: NextRequest) => {
     }
 
     // 生成登录 token
-    const jwt = generateToken(user.id, user.phone || '');
+    const jwt = generateToken({ userId: user.id, phone: user.phone || '' });
 
     return NextResponse.json({
       code: 0,
