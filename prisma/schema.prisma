@@ -61,6 +61,8 @@ model User {
   lastLoginAt DateTime? @map("last_login_at") @db.Timestamp
   lastLoginIp String?   @map("last_login_ip") @db.VarChar(50)
   expireAt   DateTime?  @map("expire_at") @db.Timestamp  // 到期时间，null表示无限制
+  status     String    @default("active") @map("status") @db.VarChar(20)  // pending=待激活, active=已激活
+  source     String    @default("organic") @map("source") @db.VarChar(20)  // nzyy=从nzyy跳转, organic=直接访问
   createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamp
   updatedAt  DateTime  @updatedAt @map("updated_at") @db.Timestamp
 

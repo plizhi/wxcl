@@ -8,6 +8,7 @@ import { dailyCareApi, nourishmentApi } from '@/lib/api';
 interface ExpiryStatus {
   expired: boolean;
   remainingDays: number | null;
+  isPending?: boolean;
 }
 
 export default function HomePage() {
@@ -45,6 +46,7 @@ export default function HomePage() {
         setExpiryStatus({
           expired: data.data.expired,
           remainingDays: data.data.remainingDays,
+          isPending: data.data.isPending,
         });
       }
     } catch (e) {
@@ -68,6 +70,33 @@ export default function HomePage() {
             </div>
           </div>
         </div>
+
+        {/* 待激活用户提示 */}
+        {expiryStatus?.isPending && (
+          <div className="mb-4 p-4 rounded-xl bg-gradient-to-r from-purple-50 to-amber-50 border border-purple-200">
+            <div className="flex items-start gap-3">
+              <span className="text-2xl">👋</span>
+              <div className="flex-1">
+                <p className="text-sm font-medium text-purple-700 mb-1">欢迎来到望杏成林！</p>
+                <p className="text-xs text-gray-600 mb-2">你的账号已创建，当前没有使用权限。获取邀请码即可解锁全部功能。</p>
+                <div className="flex gap-2">
+                  <a
+                    href="/apply"
+                    className="px-3 py-1.5 bg-purple-600 text-white text-xs rounded-full"
+                  >
+                    获取邀请码
+                  </a>
+                  <button
+                    onClick={() => router.push('/apply/stats')}
+                    className="px-3 py-1.5 border border-purple-300 text-purple-600 text-xs rounded-full"
+                  >
+                    了解推广中心
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* 欢迎语 */}
         <div className="text-center mb-6">

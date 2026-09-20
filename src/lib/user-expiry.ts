@@ -34,6 +34,7 @@ export interface ExpiryStatus {
   expireAt: string | null;
   remainingDays: number | null;
   isOldUser: boolean;
+  isPending: boolean;
 }
 
 /**
@@ -42,11 +43,22 @@ export interface ExpiryStatus {
 export async function getExpiryStatus(userId: string): Promise<ExpiryStatus> {
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { expireAt: true },
+    select: { expireAt: true, status: true },
   });
 
   if (!user) {
     throw new Error('用户不存在');
+  }
+
+  // pending 用户特殊处理
+  if (user.status === 'pending') {
+    return {
+      expired: true,
+      expireAt: null,
+      remainingDays: null,
+      isOldUser: false,
+      isPending: true,
+    };
   }
 
   if (!user.expireAt) {
@@ -56,6 +68,7 @@ export async function getExpiryStatus(userId: string): Promise<ExpiryStatus> {
       expireAt: null,
       remainingDays: null,
       isOldUser: false,
+      isPending: false,
     };
   }
 
@@ -77,19 +90,31 @@ export async function getExpiryStatus(userId: string): Promise<ExpiryStatus> {
     expireAt: user.expireAt.toISOString(),
     remainingDays: Math.max(0, remainingDays),
     isOldUser,
+    isPending: false,
   };
 }
 
 /**
  * 检查用户是否已过期（用于中间件）
+ * pending 状态的用户始终视为过期
  */
 export async function isExpired(userId: string): Promise<boolean> {
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { expireAt: true },
+    select: { expireAt: true, status: true },
   });
 
-  if (!user || !user.expireAt) {
+  if (!user) {
+    return false;
+  }
+
+  // pending 用户始终视为过期
+  if (user.status === 'pending') {
+    return true;
+  }
+
+  // 无限制用户未过期
+  if (!user.expireAt) {
     return false;
   }
 
