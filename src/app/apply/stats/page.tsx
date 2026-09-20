@@ -43,6 +43,15 @@ interface PersonalStats {
   };
 }
 
+interface Medal {
+  code: string;
+  name: string;
+  icon: string;
+  period: string;
+  rank: number;
+  earnedAt: string;
+}
+
 function StatsPageContent() {
   const router = useRouter();
   const { toast } = useToast();
@@ -60,6 +69,7 @@ function StatsPageContent() {
   const [showPoster, setShowPoster] = useState(false);
   const [savingPoster, setSavingPoster] = useState(false);
   const [customMessage, setCustomMessage] = useState('记录陪伴，看见成长');
+  const [medals, setMedals] = useState<Medal[]>([]);
   const posterRef = useRef<HTMLDivElement>(null);
 
   async function fetchRanking(p: Period, t: RankingType, phone?: string) {
@@ -131,9 +141,36 @@ function StatsPageContent() {
     }
   }, [user]);
 
+  // 获取勋章
+  useEffect(() => {
+    if (user?.phone) {
+      fetch('/api/medals')
+        .then(res => res.json())
+        .then(result => {
+          if (result.code === 0) {
+            setMedals(result.data || []);
+          }
+        })
+        .catch(() => {});
+    }
+  }, [user]);
+
   const shareUrl = typeof window !== 'undefined' && personalStats
     ? `${window.location.origin}/apply?ref=${personalStats.shareCode}`
     : '';
+
+  // 检查邀请码是否即将过期或已过期
+  const getInviteExpiryStatus = () => {
+    if (!personalStats?.inviteExpiresAt) return null;
+    const now = new Date();
+    const expiresAt = new Date(personalStats.inviteExpiresAt);
+    const diffMs = expiresAt.getTime() - now.getTime();
+    const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+    if (diffDays < 0) return 'expired';
+    if (diffDays <= 2) return 'expiring';
+    return 'valid';
+  };
+  const inviteExpiryStatus = getInviteExpiryStatus();
 
   // 下载海报
   async function downloadPoster() {
@@ -386,15 +423,35 @@ function StatsPageContent() {
 
             {/* 邀请码 */}
             {personalStats.inviteCode ? (
-              <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl p-4 text-center mb-4">
-                <p className="text-sm text-gray-500 mb-1">🎉 恭喜！你的邀请码</p>
-                <p className="text-2xl font-bold tracking-wider text-green-600">
-                  {personalStats.inviteCode}
-                </p>
-                <p className="text-xs text-gray-400">
-                  有效期至 {personalStats.inviteExpiresAt ? new Date(personalStats.inviteExpiresAt).toLocaleDateString() : '7天后'}
-                </p>
-              </div>
+              inviteExpiryStatus === 'expired' ? (
+                <div className="bg-gradient-to-br from-red-50 to-orange-50 rounded-xl p-4 text-center mb-4 border border-red-200">
+                  <p className="text-sm text-red-600 mb-1">⚠️ 邀请码已过期</p>
+                  <p className="text-2xl font-bold tracking-wider text-gray-400">
+                    {personalStats.inviteCode}
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1">继续分享获取新的邀请码</p>
+                </div>
+              ) : inviteExpiryStatus === 'expiring' ? (
+                <div className="bg-gradient-to-br from-amber-50 to-orange-50 rounded-xl p-4 text-center mb-4 border border-amber-200">
+                  <p className="text-sm text-amber-600 mb-1">⏰ 邀请码即将过期</p>
+                  <p className="text-2xl font-bold tracking-wider text-amber-600">
+                    {personalStats.inviteCode}
+                  </p>
+                  <p className="text-xs text-amber-500 mt-1">
+                    有效期至 {personalStats.inviteExpiresAt ? new Date(personalStats.inviteExpiresAt).toLocaleDateString() : '7天后'}，请尽快使用！
+                  </p>
+                </div>
+              ) : (
+                <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl p-4 text-center mb-4">
+                  <p className="text-sm text-gray-500 mb-1">🎉 恭喜！你的邀请码</p>
+                  <p className="text-2xl font-bold tracking-wider text-green-600">
+                    {personalStats.inviteCode}
+                  </p>
+                  <p className="text-xs text-gray-400">
+                    有效期至 {personalStats.inviteExpiresAt ? new Date(personalStats.inviteExpiresAt).toLocaleDateString() : '7天后'}
+                  </p>
+                </div>
+              )
             ) : (
               <div className="bg-amber-50 rounded-xl p-4 text-center mb-4">
                 <p className="text-sm text-amber-600">
@@ -563,6 +620,36 @@ function StatsPageContent() {
           <p className="text-xs text-gray-400 mt-4">
             统计周期：周榜为上周一至周日，月榜为上月1日至最后一日
           </p>
+        </div>
+
+        {/* 我的勋章 */}
+        <div className="bg-white rounded-2xl p-6 shadow-lg">
+          <h2 className="text-lg font-bold text-gray-800 mb-4">我的勋章</h2>
+          {medals.length > 0 ? (
+            <div className="grid grid-cols-2 gap-4">
+              {medals.map((medal) => (
+                <div
+                  key={medal.code}
+                  className="flex flex-col items-center p-4 bg-gradient-to-br from-yellow-50 to-amber-50 rounded-xl border border-yellow-200"
+                >
+                  <span className="text-4xl mb-2">{medal.icon}</span>
+                  <p className="text-sm font-bold text-gray-800">{medal.name}</p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    {medal.period === 'week' ? '周榜' : '月榜'} 第{medal.rank}名
+                  </p>
+                  <p className="text-xs text-gray-400 mt-1">
+                    {new Date(medal.earnedAt).toLocaleDateString()}
+                  </p>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-8 text-gray-400">
+              <p className="text-4xl mb-2">🏅</p>
+              <p className="text-sm">暂无勋章</p>
+              <p className="text-xs mt-1">周榜第1名可获得勋章</p>
+            </div>
+          )}
         </div>
       </div>
     </div>

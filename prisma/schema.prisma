@@ -149,6 +149,7 @@ model NourishmentMoment {
   childId                String   @map("child_id") @db.Uuid
   fact                   String   @db.Text
   feeling                String?  @db.Text
+  level                  String?  @map("level") @db.VarChar(20)  // 滋养层次：彼此连接、彼此看见和懂得、彼此理解、彼此支持
   source                 Source   @default(manual)
   extractedFromRecordId  String?  @map("extracted_from_record_id") @db.Uuid
   createdAt              DateTime @default(now()) @map("created_at") @db.Timestamp

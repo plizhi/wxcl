@@ -3,6 +3,7 @@ import { withErrorHandler, errors } from "@/lib/api-error";
 import { prisma } from "@/lib/prisma";
 import { getAuthFromRequest } from "@/lib/auth-utils";
 import { callAI } from "@/lib/ai";
+import { checkParentingContent, REFUSAL_MESSAGE } from "@/lib/content-filter";
 
 const SYSTEM_PROMPTS = {
   daily: `你是「内在结构养育」陪伴顾问。分析今日记录，给出：1个亮点 + 1个机会。不用 JSON，用 Markdown。不超过100字。禁止说教。`,
@@ -44,6 +45,16 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
 
   if (!message) {
     throw errors.badRequest("message is required");
+  }
+
+  // 非育儿内容直接婉拒
+  const filterResult = checkParentingContent(message);
+  if (!filterResult.isParentingRelated) {
+    return NextResponse.json({
+      code: 0,
+      message: "success",
+      data: { reply: REFUSAL_MESSAGE, intent: "chat", filtered: true },
+    });
   }
 
   const intent = intentOverride || classify(message);

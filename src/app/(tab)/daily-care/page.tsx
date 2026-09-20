@@ -352,8 +352,16 @@ export default function DailyCarePage() {
               <div className="space-y-3 mb-4 max-h-48 overflow-y-auto">
                 {extractions.map((ext, i) => (
                   <div key={i} className="bg-pink-50 rounded-lg p-3">
-                    <p className="text-sm font-medium text-pink-700">✨ {ext.fact}</p>
-                    <p className="text-xs text-gray-500 mt-1">感受：{ext.feeling}</p>
+                    <div className="flex items-start gap-2">
+                      <span className="text-pink-400">✨</span>
+                      <div>
+                        <p className="text-sm font-medium text-pink-700">{ext.fact}</p>
+                        <p className="text-xs text-gray-500 mt-1">感受：{ext.feeling}</p>
+                        {ext.level && (
+                          <p className="text-xs text-pink-400 mt-1">层次：{ext.level}</p>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 ))}
               </div>

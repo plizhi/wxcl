@@ -309,9 +309,14 @@ export default function NourishmentPage() {
             {moments.map(item => (
               <div key={item.id} className="bg-white rounded-xl p-4 shadow-sm">
                 <p className="text-sm text-gray-700 mb-2">{item.fact}</p>
-                {item.feeling && (
-                  <p className="text-xs text-purple-600 bg-purple-50 rounded-lg px-3 py-2 inline-block">{item.feeling}</p>
-                )}
+                <div className="flex flex-wrap gap-2">
+                  {item.feeling && (
+                    <p className="text-xs text-purple-600 bg-purple-50 rounded-lg px-3 py-2 inline-block">{item.feeling}</p>
+                  )}
+                  {item.level && (
+                    <p className="text-xs text-pink-600 bg-pink-50 rounded-lg px-3 py-2 inline-block">{item.level}</p>
+                  )}
+                </div>
                 <p className="text-xs text-gray-400 mt-2">
                   {item.createdAt && new Date(item.createdAt).toLocaleDateString('zh-CN', { month: 'long', day: 'numeric' })}
                 </p>

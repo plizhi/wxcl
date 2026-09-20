@@ -236,6 +236,19 @@ export default function ApplyStatusPage() {
 
   const hasInviteCode = !!data.inviteCode;
 
+  // 检查邀请码是否即将过期或已过期
+  const getInviteExpiryStatus = () => {
+    if (!data?.inviteExpiresAt) return null;
+    const now = new Date();
+    const expiresAt = new Date(data.inviteExpiresAt);
+    const diffMs = expiresAt.getTime() - now.getTime();
+    const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+    if (diffDays < 0) return 'expired';
+    if (diffDays <= 2) return 'expiring';
+    return 'valid';
+  };
+  const inviteExpiryStatus = getInviteExpiryStatus();
+
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-br from-amber-50 to-purple-50">
       {/* Banner */}
@@ -328,15 +341,37 @@ export default function ApplyStatusPage() {
           {/* 邀请码（如果有） */}
           {hasInviteCode && (
             <div className="mb-6">
-              <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl p-6 text-center">
-                <p className="text-sm text-gray-500 mb-2">🎉 恭喜！你的邀请码</p>
-                <p className="text-3xl font-bold tracking-wider text-green-600 mb-2">
-                  {data.inviteCode}
-                </p>
-                <p className="text-xs text-gray-400">
-                  有效期至 {data.inviteExpiresAt ? new Date(data.inviteExpiresAt).toLocaleDateString() : '7天后'}
-                </p>
-              </div>
+              {inviteExpiryStatus === 'expired' ? (
+                <div className="bg-gradient-to-br from-red-50 to-orange-50 rounded-xl p-6 text-center border border-red-200">
+                  <p className="text-sm text-red-600 mb-2">⚠️ 邀请码已过期</p>
+                  <p className="text-3xl font-bold tracking-wider text-gray-400 mb-2">
+                    {data.inviteCode}
+                  </p>
+                  <p className="text-xs text-gray-500">
+                    继续分享获取新的邀请码
+                  </p>
+                </div>
+              ) : inviteExpiryStatus === 'expiring' ? (
+                <div className="bg-gradient-to-br from-amber-50 to-orange-50 rounded-xl p-6 text-center border border-amber-200">
+                  <p className="text-sm text-amber-600 mb-2">⏰ 邀请码即将过期</p>
+                  <p className="text-3xl font-bold tracking-wider text-amber-600 mb-2">
+                    {data.inviteCode}
+                  </p>
+                  <p className="text-xs text-amber-500">
+                    有效期至 {data.inviteExpiresAt ? new Date(data.inviteExpiresAt).toLocaleDateString() : '7天后'}，请尽快使用！
+                  </p>
+                </div>
+              ) : (
+                <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl p-6 text-center">
+                  <p className="text-sm text-gray-500 mb-2">🎉 恭喜！你的邀请码</p>
+                  <p className="text-3xl font-bold tracking-wider text-green-600 mb-2">
+                    {data.inviteCode}
+                  </p>
+                  <p className="text-xs text-gray-400">
+                    有效期至 {data.inviteExpiresAt ? new Date(data.inviteExpiresAt).toLocaleDateString() : '7天后'}
+                  </p>
+                </div>
+              )}
             </div>
           )}
 

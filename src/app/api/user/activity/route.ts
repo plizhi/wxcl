@@ -5,6 +5,7 @@ import { withErrorHandler } from '@/lib/api-error';
 import { getAuthFromRequest } from '@/lib/auth-utils';
 import { errors } from '@/lib/api-error';
 import { recordActivity, type ActivityType } from '@/lib/user-expiry';
+import { checkRateLimit, rateLimitResponse } from '@/lib/rate-limit';
 
 const VALID_TYPES: ActivityType[] = ['share', 'invite', 'feedback'];
 
@@ -13,6 +14,12 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   const auth = getAuthFromRequest(req);
   if (!auth) {
     throw errors.unauthorized();
+  }
+
+  // 限流：同一用户 10次/分钟
+  const limit = checkRateLimit(`activity:${auth.userId}`, 10, 60 * 1000);
+  if (!limit.allowed) {
+    return rateLimitResponse(limit.resetIn);
   }
 
   const { type } = await req.json();
