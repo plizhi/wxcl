@@ -13,6 +13,8 @@ export interface User {
   changeGoal?: string[];
   profileCompleted?: boolean;
   parentRole?: string;
+  status?: string; // pending | active
+  source?: string; // nzyy | organic
 }
 
 export interface ChildProfile {

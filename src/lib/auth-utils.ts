@@ -48,6 +48,21 @@ export async function checkNotExpired(req: NextRequest): Promise<AuthResult | Ne
   const { isExpired } = await import('./user-expiry');
 
   if (await isExpired(auth.userId)) {
+    // 查询用户状态，区分 pending 和普通过期
+    const { prisma } = await import('@/lib/prisma');
+    const user = await prisma.user.findUnique({
+      where: { id: auth.userId },
+      select: { status: true },
+    });
+
+    if (user?.status === 'pending') {
+      return NextResponse.json({
+        code: 403,
+        message: '账号尚未激活，请获取邀请码',
+        pending: true,
+      }, { status: 403 });
+    }
+
     return NextResponse.json({
       code: 403,
       message: '账号已冻结，请邀请1人解冻',

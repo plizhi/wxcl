@@ -10,6 +10,7 @@ interface AuthContextType {
   isLoggedIn: boolean;
   isLoading: boolean;
   login: (phone: string, activationCode?: string, password?: string, parentRole?: string) => Promise<void>;
+  loginWithToken: (token: string) => Promise<void>;
   logout: () => void;
   fetchUserInfo: () => Promise<void>;
   updateUser: (data: Partial<User>) => Promise<void>;
@@ -45,6 +46,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  // 直接用 token 登录（用于 nzyy 跳转绑定）
+  const loginWithToken = useCallback(async (jwt: string) => {
+    localStorage.setItem('token', jwt);
+    setToken(jwt);
+    try {
+      const userData = await userApi.getCurrentUser();
+      setUser(userData);
+    } catch (e) {
+      console.error('获取用户信息失败', e);
+    }
+  }, []);
+
   const logout = useCallback(() => {
     localStorage.removeItem('token');
     localStorage.removeItem('userId');
@@ -68,7 +81,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [fetchUserInfo]);
 
   return (
-    <AuthContext.Provider value={{ user, token, isLoggedIn, isLoading, login, logout, fetchUserInfo, updateUser }}>
+    <AuthContext.Provider value={{ user, token, isLoggedIn, isLoading, login, loginWithToken, logout, fetchUserInfo, updateUser }}>
       {children}
     </AuthContext.Provider>
   );

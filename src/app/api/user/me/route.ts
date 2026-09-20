@@ -24,6 +24,8 @@ export const GET = withErrorHandler(async (request: NextRequest) => {
       nickname: true,
       avatarUrl: true,
       parentRole: true,
+      status: true,
+      source: true,
       createdAt: true,
     },
   });
@@ -44,6 +46,8 @@ export const GET = withErrorHandler(async (request: NextRequest) => {
       nickname: user.nickname,
       avatarUrl: user.avatarUrl,
       parentRole: user.parentRole,
+      status: user.status,
+      source: user.source,
       createdAt: user.createdAt,
       childCount,
     },
