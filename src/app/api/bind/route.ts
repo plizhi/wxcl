@@ -4,28 +4,26 @@ import { generateToken } from '@/lib/auth';
 
 const NZYY_API_URL = process.env.NZYY_API_URL || 'https://nzyy.cc/api';
 
-interface BindParams {
-  phone: string;
-  from: string;
-  token: string;
-}
-
 /**
- * 验证 nzyy 跳转 token
+ * 调用 nzyy 验证 token
  * nzyy 提供 /api/portal/verify-bind 接口
+ * 返回 verifiedPhone 如果验证成功
  */
-async function verifyNzyyToken(phone: string, token: string): Promise<boolean> {
+async function verifyNzyyToken(token: string): Promise<{ valid: boolean; phone?: string; error?: string }> {
   try {
     const res = await fetch(`${NZYY_API_URL}/portal/verify-bind`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ phone, token }),
+      body: JSON.stringify({ token, target_app: 'wxcl' }),
     });
-    if (!res.ok) return false;
     const data = await res.json();
-    return data.valid === true;
-  } catch {
-    return false;
+    if (data.valid === true) {
+      return { valid: true, phone: data.phone };
+    }
+    return { valid: false, error: data.error || '验证失败' };
+  } catch (err) {
+    console.error('[bind] verifyNzyyToken error:', err);
+    return { valid: false, error: '网络错误' };
   }
 }
 
@@ -35,18 +33,24 @@ async function verifyNzyyToken(phone: string, token: string): Promise<boolean> {
  */
 export const POST = async (req: NextRequest) => {
   try {
-    const { phone, from, token } = await req.json() as BindParams;
+    const { phone: inputPhone, from, token } = await req.json();
 
     // 安全检查
-    if (from !== 'nzyy' || !phone || !token) {
+    if (from !== 'nzyy' || !token) {
       return NextResponse.json({ code: 400, message: '参数错误' }, { status: 400 });
     }
 
     // 验证 token（调用 nzyy API）
-    const valid = await verifyNzyyToken(phone, token);
-    if (!valid) {
-      return NextResponse.json({ code: 401, message: '验证失败，请勿重复操作' }, { status: 401 });
+    const verifyResult = await verifyNzyyToken(token);
+    if (!verifyResult.valid || !verifyResult.phone) {
+      return NextResponse.json(
+        { code: 401, message: verifyResult.error || '验证失败' },
+        { status: 401 }
+      );
     }
+
+    // 使用 nzyy 返回的手机号（更可信）
+    const phone = verifyResult.phone;
 
     // 查找或创建用户
     let user = await prisma.user.findUnique({ where: { phone } });
@@ -66,7 +70,11 @@ export const POST = async (req: NextRequest) => {
       if (user.status === 'active' && user.source === 'organic') {
         // 已经是正式用户，不覆盖，直接返回 token
         const jwt = generateToken(user.id, user.phone || '');
-        return NextResponse.json({ code: 0, message: 'success', data: { token: jwt, isNew: false } });
+        return NextResponse.json({
+          code: 0,
+          message: 'success',
+          data: { token: jwt, isNew: false },
+        });
       }
       // 更新为 pending
       user = await prisma.user.update({
