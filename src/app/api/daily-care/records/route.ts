@@ -54,6 +54,7 @@ export const GET = withErrorHandler(async (req: NextRequest) => {
           id: r.id,
           content: r.content,
           reply: r.reply,
+          intent: r.intent,
           createdAt: r.createdAt,
           report,
         };

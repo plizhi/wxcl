@@ -21,6 +21,9 @@ export default function ProfilePage() {
   const [showAdd, setShowAdd] = useState(false);
   const [editingChild, setEditingChild] = useState<ChildInfo | null>(null);
   const [showUserEdit, setShowUserEdit] = useState(false);
+  const [showFeedback, setShowFeedback] = useState(false);
+  const [feedbackText, setFeedbackText] = useState('');
+  const [feedbackLoading, setFeedbackLoading] = useState(false);
   const [userForm, setUserForm] = useState({
     nickname: '',
     parentRole: '',
@@ -89,6 +92,33 @@ export default function ProfilePage() {
       refreshChildren();
     } catch (e) {
       console.error('保存失败', e);
+    }
+  }
+
+  async function handleFeedback() {
+    if (!feedbackText.trim()) return;
+    setFeedbackLoading(true);
+    try {
+      const res = await fetch('/api/user/activity', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token') || ''}`,
+        },
+        body: JSON.stringify({ type: 'feedback' }),
+      });
+      const data = await res.json();
+      if (data.code === 0) {
+        setShowFeedback(false);
+        setFeedbackText('');
+        alert('感谢您的反馈！');
+      } else {
+        alert(data.message || '提交失败');
+      }
+    } catch (e) {
+      alert('提交失败');
+    } finally {
+      setFeedbackLoading(false);
     }
   }
 
@@ -249,6 +279,23 @@ export default function ProfilePage() {
         </button>
       </div>
 
+      {/* 意见反馈入口 */}
+      <div className="mx-4 mt-4 bg-white rounded-2xl shadow-sm overflow-hidden">
+        <button
+          onClick={() => setShowFeedback(true)}
+          className="w-full flex items-center justify-between px-5 py-4"
+        >
+          <div className="flex items-center gap-3">
+            <span className="text-xl">💬</span>
+            <div className="text-left">
+              <p className="text-gray-700">意见反馈</p>
+              <p className="text-xs text-gray-400">提交反馈可延长使用时长</p>
+            </div>
+          </div>
+          <span className="text-gray-400">→</span>
+        </button>
+      </div>
+
       {/* 推广数据中心入口 */}
       <div className="mx-4 mt-4 bg-white rounded-2xl shadow-sm overflow-hidden">
         <button
@@ -398,6 +445,40 @@ export default function ProfilePage() {
                   保存
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 意见反馈弹窗 */}
+      {showFeedback && (
+        <div className="fixed inset-0 z-[200] bg-black/50 flex items-end sm:items-center justify-center">
+          <div className="bg-white w-full sm:w-[420px] rounded-t-2xl sm:rounded-2xl p-6">
+            <h3 className="text-lg font-semibold mb-4">意见反馈</h3>
+            <p className="text-sm text-gray-500 mb-4">每月提交3次反馈可延长1个月使用时长</p>
+            <div className="mb-4">
+              <textarea
+                value={feedbackText}
+                onChange={e => setFeedbackText(e.target.value)}
+                placeholder="请输入您的意见或建议..."
+                rows={4}
+                className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm resize-none"
+              />
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => { setShowFeedback(false); setFeedbackText(''); }}
+                className="flex-1 py-3 border border-gray-200 rounded-full text-gray-500 text-sm"
+              >
+                取消
+              </button>
+              <button
+                onClick={handleFeedback}
+                disabled={feedbackLoading || !feedbackText.trim()}
+                className="flex-1 py-3 bg-purple-500 text-white rounded-full text-sm disabled:opacity-50"
+              >
+                {feedbackLoading ? '提交中...' : '提交'}
+              </button>
             </div>
           </div>
         </div>

@@ -25,6 +25,11 @@ export default function DailyCarePage() {
 
   useEffect(() => {
     loadRecords();
+    // 检测是否跳过添加孩子
+    if (!currentChildId && localStorage.getItem('add_child_skipped') === 'true') {
+      localStorage.removeItem('add_child_skipped');
+      toast('请先添加孩子信息，以便更好地分析记录', 'info');
+    }
   }, []);
 
   async function loadRecords() {
@@ -75,7 +80,7 @@ export default function DailyCarePage() {
       const data = await res.json();
       if (data.extractions && data.extractions.length > 0) {
         setExtractions(data.extractions);
-        toast(`提取到 ${data.extractions.length} 个温暖时刻`, 'success');
+        toast(`已保存 ${data.savedCount || data.extractions.length} 个温暖时刻`, 'success');
       } else {
         toast('本次记录没有提取到新的温暖时刻', 'info');
         setShowNourishGuide(false);
@@ -347,8 +352,16 @@ export default function DailyCarePage() {
               <div className="space-y-3 mb-4 max-h-48 overflow-y-auto">
                 {extractions.map((ext, i) => (
                   <div key={i} className="bg-pink-50 rounded-lg p-3">
-                    <p className="text-sm font-medium text-pink-700">✨ {ext.fact}</p>
-                    <p className="text-xs text-gray-500 mt-1">感受：{ext.feeling}</p>
+                    <div className="flex items-start gap-2">
+                      <span className="text-pink-400">✨</span>
+                      <div>
+                        <p className="text-sm font-medium text-pink-700">{ext.fact}</p>
+                        <p className="text-xs text-gray-500 mt-1">感受：{ext.feeling}</p>
+                        {ext.level && (
+                          <p className="text-xs text-pink-400 mt-1">层次：{ext.level}</p>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 ))}
               </div>

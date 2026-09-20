@@ -60,10 +60,13 @@ model User {
   parentRole String?   @map("parent_role") @db.VarChar(20)
   lastLoginAt DateTime? @map("last_login_at") @db.Timestamp
   lastLoginIp String?   @map("last_login_ip") @db.VarChar(50)
+  expireAt   DateTime?  @map("expire_at") @db.Timestamp  // 到期时间，null表示无限制
   createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamp
   updatedAt  DateTime  @updatedAt @map("updated_at") @db.Timestamp
 
-  children   Child[]
+  children     Child[]
+  apply       Apply?
+  activities   UserActivity[]
 
   @@map("users")
 }
@@ -146,6 +149,7 @@ model NourishmentMoment {
   childId                String   @map("child_id") @db.Uuid
   fact                   String   @db.Text
   feeling                String?  @db.Text
+  level                  String?  @map("level") @db.VarChar(20)  // 滋养层次：彼此连接、彼此看见和懂得、彼此理解、彼此支持
   source                 Source   @default(manual)
   extractedFromRecordId  String?  @map("extracted_from_record_id") @db.Uuid
   createdAt              DateTime @default(now()) @map("created_at") @db.Timestamp
@@ -301,6 +305,24 @@ model ParentReflection {
   @@map("parent_reflections")
 }
 
+// ========== 用户行为记录 ==========
+
+model UserActivity {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id") @db.Uuid
+  type      String   @db.VarChar(20)  // "share" | "invite" | "feedback"
+  month     String   @db.VarChar(7)    // "2026-09" 格式
+  count     Int      @default(1)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamp
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, type, month])
+  @@index([userId])
+  @@index([month])
+  @@map("user_activities")
+}
+
 // ========== 邀请申请 ==========
 
 model Apply {
@@ -312,9 +334,14 @@ model Apply {
   inviteCode  String?   @unique @map("invite_code") @db.VarChar(8)
   inviteUsedAt DateTime? @map("invite_used_at") @db.Timestamp
   inviteExpiresAt DateTime? @map("invite_expires_at") @db.Timestamp
+  userId      String?   @unique @map("user_id") @db.Uuid  // 关联正式用户
+  activatedAt DateTime? @map("activated_at") @db.Timestamp
   createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamp
 
+  user        User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+
   @@index([referrerId])
+  @@index([userId])
   @@map("applies")
 }
 
@@ -328,4 +355,20 @@ model ShareLog {
 
   @@index([applyId])
   @@map("share_logs")
+}
+
+// 激励发放记录
+model ApplyReward {
+  id         String   @id @default(cuid())
+  applyId    String   @map("apply_id") @db.Uuid
+  period     String   @db.VarChar(10)  // "week" | "month"
+  type       String   @db.VarChar(10)  // "opens" | "users"
+  rank       Int
+  rewardCode String?  @map("reward_code") @db.VarChar(8)
+  medal      Boolean  @default(false)  // 是否发放电子勋章
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamp
+
+  @@unique([applyId, period, type])
+  @@index([applyId])
+  @@map("apply_rewards")
 }

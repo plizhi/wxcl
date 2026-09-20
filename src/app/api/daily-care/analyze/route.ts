@@ -4,6 +4,7 @@ import { getAuthFromRequest } from "@/lib/auth-utils";
 import { callAI, parseAIResponse } from "@/lib/ai";
 import { DailyCareReport } from "@/lib/types";
 import { withErrorHandler, errors } from "@/lib/api-error";
+import { checkParentingContent, REFUSAL_MESSAGE } from "@/lib/content-filter";
 
 // 根据用户身份构建 system prompt
 function buildSystemPrompt(basePrompt: string, parentRole?: string): string {
@@ -242,6 +243,20 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
 
   if (!content || typeof content !== "string") {
     throw errors.badRequest("内容不能为空");
+  }
+
+  // 非育儿内容直接婉拒
+  const filterResult = checkParentingContent(content);
+  if (!filterResult.isParentingRelated) {
+    return NextResponse.json({
+      code: 0,
+      message: "success",
+      data: {
+        reply: REFUSAL_MESSAGE,
+        filtered: true,
+        no_records: true,
+      },
+    });
   }
 
   const maxLength = 2000;

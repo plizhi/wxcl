@@ -204,6 +204,7 @@ export interface NourishmentMoment {
   childId: string;
   fact: string;
   feeling?: string;
+  level?: string;
   source: 'manual' | 'accompany' | 'extracted';
   extractedFromRecordId?: string;
   createdAt?: string;

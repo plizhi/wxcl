@@ -30,7 +30,7 @@ export default function QuestionsPage() {
       const data = await res.json();
       if (data.records) {
         // 过滤出压力吐槽类型的记录
-        const ventingRecords = data.records.filter((r: any) => r.report?.intent === 'venting');
+        const ventingRecords = data.records.filter((r: any) => r.intent === 'venting');
         setRecords(ventingRecords);
       }
     } catch (e) {

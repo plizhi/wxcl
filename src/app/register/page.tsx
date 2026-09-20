@@ -41,12 +41,15 @@ function RegisterPageContent() {
   };
 
   const handleOtherSelect = (role: string) => {
+    // 选择其他角色时，清空 parentRole
+    setParentRole('');
     setOtherRole(role);
     setShowOtherDropdown(false);
   };
 
   const getDisplayRole = () => {
-    if (parentRole && otherRole && !['爸爸', '妈妈'].includes(otherRole)) {
+    // 如果选了其他角色（爷爷、奶奶等），优先用 otherRole
+    if (otherRole && !['爸爸', '妈妈'].includes(otherRole)) {
       return otherRole;
     }
     return parentRole || otherRole;

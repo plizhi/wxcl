@@ -2,6 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { generateToken, verifyPassword, hashPassword } from "@/lib/auth";
 import { withErrorHandler, errors } from "@/lib/api-error";
+import { initializeNewUser, unfreezeByInvite, recordActivity } from "@/lib/user-expiry";
+import crypto from "crypto";
+
+function generateShareCode(): string {
+  return crypto.randomBytes(4).toString('hex').toUpperCase();
+}
 
 export const POST = withErrorHandler(async (request: NextRequest) => {
   const { phone, password, activationCode, parentRole } = await request.json();
@@ -32,6 +38,7 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
       // 使用新的 Apply 邀请码
       // 查找或创建用户
       let targetUserId: string;
+      let isNewUser = false;
       if (user) {
         targetUserId = user.id;
       } else {
@@ -39,6 +46,7 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
           data: { phone, nickname: "用户", parentRole: parentRole || null },
         });
         targetUserId = newUser.id;
+        isNewUser = true;
       }
 
       // 标记邀请码已使用
@@ -46,6 +54,47 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
         where: { id: applyInvite.id },
         data: { inviteUsedAt: new Date(), status: 'activated' },
       });
+
+      // 创建/更新被邀请者的 Apply 记录
+      let apply = await prisma.apply.findUnique({
+        where: { phone },
+      });
+
+      if (!apply) {
+        // 新创建 Apply（被邀请者注册）
+        apply = await prisma.apply.create({
+          data: {
+            phone,
+            shareCode: generateShareCode(),
+            status: 'activated',
+            userId: targetUserId,
+            activatedAt: new Date(),
+            referrerId: applyInvite.id, // 推荐人
+          },
+        });
+      } else {
+        // 更新已有 Apply
+        apply = await prisma.apply.update({
+          where: { id: apply.id },
+          data: {
+            status: 'activated',
+            userId: targetUserId,
+            activatedAt: new Date(),
+            referrerId: applyInvite.id,
+          },
+        });
+      }
+
+      // 新用户初始化时长
+      if (isNewUser) {
+        await initializeNewUser(targetUserId);
+      }
+
+      // 给邀请者记录 invite 行为（好友成功注册）
+      if (applyInvite.userId) {
+        await unfreezeByInvite(applyInvite.userId);
+        await recordActivity(applyInvite.userId, 'invite');
+      }
 
       const token = generateToken({ userId: targetUserId, phone });
       return NextResponse.json({
@@ -83,6 +132,20 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
         data: { phone, nickname: "用户", parentRole: parentRole || null, password: hashedCode },
         select: { id: true },
       });
+
+      // 创建 Apply 记录
+      await prisma.apply.create({
+        data: {
+          phone,
+          shareCode: generateShareCode(),
+          status: 'activated',
+          userId: newUser.id,
+          activatedAt: new Date(),
+        },
+      });
+
+      // 新用户初始化时长
+      await initializeNewUser(newUser.id);
 
       const token = generateToken({ userId: newUser.id, phone });
       return NextResponse.json({
