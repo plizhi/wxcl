@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma';
 
 const AUTH_BASE     = process.env.AUTH_BASE_URL!;
 const CLIENT_ID     = process.env.CLIENT_ID! || 'wxcl';
-const CLIENT_SECRET = process.env.CLIENT_SECRET!;
+const CLIENT_SECRET = process.env.CLIENT_WXCL_SECRET!;
 const REDIRECT_URI  = process.env.WXCL_REDIRECT_URI!;
 const JWT_ISSUER   = process.env.JWT_ISSUER!;
 
