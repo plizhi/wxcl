@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { generateToken } from "@/lib/auth";
 import { withErrorHandler, errors } from "@/lib/api-error";
+import { initializeNewUser } from "@/lib/user-expiry";
 
 export const POST = withErrorHandler(async (request: NextRequest) => {
   const { phone, code } = await request.json();
@@ -39,14 +40,22 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
 
   let user = await prisma.user.findUnique({
     where: { phone: userPhone },
-    select: { id: true },
+    select: { id: true, expireAt: true },
   });
+
+  let isNewUser = false;
 
   if (!user) {
     user = await prisma.user.create({
       data: { phone: userPhone, nickname: "用户" },
-      select: { id: true },
+      select: { id: true, expireAt: true },
     });
+    isNewUser = true;
+  }
+
+  // 新用户统一初始化6个月时长
+  if (isNewUser || !user.expireAt) {
+    await initializeNewUser(user.id);
   }
 
   const token = generateToken({ userId: user.id, phone: userPhone });

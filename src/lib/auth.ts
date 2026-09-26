@@ -48,3 +48,28 @@ export function generateCode(): string {
   }
   return code;
 }
+
+// ---------- 双验过渡：优先新 token，降级旧 token ----------
+import { verifyPortalToken } from './auth-portal';
+
+export interface SessionResult {
+  mode: 'portal' | 'legacy';
+  unionId: string | null;
+  uid: string | null;
+}
+
+export async function verifySession(token: string): Promise<SessionResult | null> {
+  // 新 token：RS256 验签，union_id 直接可用
+  try {
+    const payload = await verifyPortalToken(token);
+    return { mode: 'portal', unionId: payload.union_id, uid: null };
+  } catch { /* fallthrough */ }
+
+  // 过渡期：旧本地 JWT 仍有效
+  try {
+    const payload = jwt.verify(token, JWT_SECRET!) as { uid: string };
+    return { mode: 'legacy', uid: payload.uid, unionId: null };
+  } catch {
+    return null;
+  }
+}

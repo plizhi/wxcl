@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getTokenFromHeader, verifyToken } from "@/lib/auth";
 import { withErrorHandler, errors } from "@/lib/api-error";
+import { earnPoints } from "@/lib/points";
 
 // GET /api/records?childId=xxx - 获取孩子的陪伴记录
 export const GET = withErrorHandler(async (req: NextRequest) => {
@@ -75,6 +76,9 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     data: { childId, content, reply, intent },
     select: { id: true, createdAt: true },
   });
+
+  // 添加陪伴记录获得积分
+  await earnPoints(auth.userId, 'record', record.id, '添加陪伴记录');
 
   return NextResponse.json({ code: 0, message: "成功", data: { record } });
 });

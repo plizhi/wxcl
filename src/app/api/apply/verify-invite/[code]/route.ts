@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { apiSuccess, apiError } from '@/lib/response';
 import { withErrorHandler } from '@/lib/api-error';
 import { initializeNewUser, unfreezeByInvite, recordActivity } from '@/lib/user-expiry';
+import { earnPoints } from '@/lib/points';
 import crypto from 'crypto';
 
 function generateShareCode(): string {
@@ -99,10 +100,12 @@ export const POST = withErrorHandler(async (req: NextRequest, { params }: { para
     await initializeNewUser(user.id);
   }
 
-  // 给邀请者记录 invite 行为
+  // 给邀请者记录 invite 行为和积分
   if (inviterApply.userId) {
     await unfreezeByInvite(inviterApply.userId);
     await recordActivity(inviterApply.userId, 'invite');
+    // 邀请成功获得 +20 积分
+    await earnPoints(inviterApply.userId, 'invite', user.id, '邀请新用户注册');
   }
 
   return apiSuccess({

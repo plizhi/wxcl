@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getAuthFromRequest } from "@/lib/auth-utils";
 import { withErrorHandler, errors } from "@/lib/api-error";
 import { apiSuccess } from "@/lib/response";
+import { earnPoints } from "@/lib/points";
 
 async function getUserFirstChildId(userId: string): Promise<string | null> {
   const child = await prisma.child.findFirst({
@@ -107,6 +108,9 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
       createdAt: true,
     },
   });
+
+  // 添加滋养时刻获得积分
+  await earnPoints(auth.userId, 'nourishment', moment.id, '添加滋养时刻');
 
   return apiSuccess({ moment });
 });

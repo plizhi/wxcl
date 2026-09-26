@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getAuthFromRequest } from "@/lib/auth-utils";
 import { withErrorHandler, errors } from "@/lib/api-error";
+import { earnPoints, hasEarnedOneTimeReward } from "@/lib/points";
 
 // 辅助函数：获取用户第一个孩子
 async function getUserFirstChildId(userId: string): Promise<string | null> {
@@ -123,9 +124,21 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     select: {
       id: true,
       childId: true,
+      personality: true,
+      interests: true,
+      strengths: true,
       updatedAt: true,
     },
   });
+
+  // 首次完善孩子画像获得积分（三个核心字段都有值才算完善）
+  const isComplete = result.personality && result.interests && result.strengths;
+  if (isComplete) {
+    const alreadyEarned = await hasEarnedOneTimeReward(auth.userId, 'firstProfile');
+    if (!alreadyEarned) {
+      await earnPoints(auth.userId, 'firstProfile', result.id, '首次完善孩子画像');
+    }
+  }
 
   return NextResponse.json({ code: 0, message: "成功", data: { profile: result } });
 });

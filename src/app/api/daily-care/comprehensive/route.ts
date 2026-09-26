@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getAuthFromRequest } from "@/lib/auth-utils";
 import { callAI, parseAIResponse } from "@/lib/ai";
 import { withErrorHandler, errors } from "@/lib/api-error";
+import { earnPoints } from "@/lib/points";
 
 const SYSTEM_PROMPTS = {
   comprehensive: `你是「内在结构养育」陪伴顾问。请分析以下多天的陪伴记录，从专业框架给出综合解读。
@@ -115,6 +116,9 @@ export const GET = withErrorHandler(async (req: NextRequest) => {
   } catch {
     report = { growth_summary: aiResponse.content.substring(0, 200) };
   }
+
+  // 生成全景报告获得积分
+  await earnPoints(auth.userId, 'report', undefined, '生成全景报告');
 
   return NextResponse.json({ code: 0, message: "成功", data: report });
 });

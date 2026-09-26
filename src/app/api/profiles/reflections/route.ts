@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getAuthFromRequest } from "@/lib/auth-utils";
 import { withErrorHandler, errors } from "@/lib/api-error";
+import { earnPoints } from "@/lib/points";
 
 export const GET = withErrorHandler(async (req: NextRequest) => {
   const auth = getAuthFromRequest(req);
@@ -75,6 +76,9 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     },
     select: { id: true },
   });
+
+  // 提交家长反思获得积分
+  await earnPoints(auth.userId, 'reflection', reflection.id, '提交家长反思');
 
   return NextResponse.json({
     code: 0,

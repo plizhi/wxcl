@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { apiSuccess, apiError } from '@/lib/response';
 import { withErrorHandler } from '@/lib/api-error';
 import { checkRateLimit, rateLimitResponse } from '@/lib/rate-limit';
+import { earnPoints } from '@/lib/points';
 
 // GET - 记录分享打开
 export const GET = withErrorHandler(async (req: NextRequest, { params }: { params: Promise<{ shareCode: string }> }) => {
@@ -26,12 +27,17 @@ export const GET = withErrorHandler(async (req: NextRequest, { params }: { param
   }
 
   // 记录打开
-  await prisma.shareLog.create({
+  const shareLog = await prisma.shareLog.create({
     data: {
       applyId: apply.id,
       visitorIp,
     },
   });
+
+  // 分享被点击给分享者 +1 积分
+  if (apply.userId) {
+    await earnPoints(apply.userId, 'share', shareLog.id, '分享被点击');
+  }
 
   // 获取当前统计
   const shareLogs = await prisma.shareLog.count({

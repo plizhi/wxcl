@@ -5,6 +5,7 @@ import { callAI, parseAIResponse } from "@/lib/ai";
 import { DailyCareReport } from "@/lib/types";
 import { withErrorHandler, errors } from "@/lib/api-error";
 import { checkParentingContent, REFUSAL_MESSAGE } from "@/lib/content-filter";
+import { earnPoints } from "@/lib/points";
 
 // 根据用户身份构建 system prompt
 function buildSystemPrompt(basePrompt: string, parentRole?: string): string {
@@ -319,6 +320,11 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
       ].filter(Boolean) as Array<{ dimension?: string; description?: string; suggestion?: string } | null>;
       await saveOpportunities(childId, recordId, opportunities);
     }
+  }
+
+  // 压力吐槽获得积分
+  if (intent === "venting" && recordId) {
+    await earnPoints(auth.userId, 'vent', recordId, '提交压力吐槽');
   }
 
   return NextResponse.json({
