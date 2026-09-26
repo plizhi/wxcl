@@ -198,6 +198,41 @@ export const profileApi = {
     ),
 };
 
+// Points API
+export interface PointsInfo {
+  balance: number;
+  maxPoints: number;
+  expireAt: string | null;
+  monthStats: { type: string; _sum: { amount: number } }[];
+}
+
+export interface PointTransaction {
+  id: string;
+  userId: string;
+  type: string;
+  amount: number;
+  balance: number;
+  description: string | null;
+  relatedId: string | null;
+  createdAt: string;
+}
+
+export interface PointHistory {
+  transactions: PointTransaction[];
+  total: number;
+}
+
+export const pointsApi = {
+  getPoints: () => request<PointsInfo>('/api/user/points'),
+  getHistory: (limit = 50, offset = 0) =>
+    request<PointHistory>(`/api/user/points/history?limit=${limit}&offset=${offset}`),
+  redeem: ( redeemType: 'oneMonth' | 'sixMonths' | 'twelveMonths') =>
+    request<{ success: boolean; pointsSpent: number; monthsAdded: number; newExpireAt: string }>('/api/user/points/redeem', {
+      method: 'POST',
+      body: JSON.stringify({ redeemType }),
+    }),
+};
+
 // Nourishment API
 export interface NourishmentMoment {
   id?: string;

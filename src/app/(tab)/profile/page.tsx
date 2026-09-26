@@ -242,6 +242,23 @@ export default function ProfilePage() {
         </button>
       </div>
 
+      {/* 积分入口 */}
+      <div className="mx-4 mt-4">
+        <button
+          onClick={() => router.push('/profile/points')}
+          className="w-full bg-gradient-to-r from-amber-400 to-orange-400 rounded-2xl p-4 text-white"
+        >
+          <div className="flex items-center gap-3">
+            <span className="text-3xl">⭐</span>
+            <div className="flex-1">
+              <p className="font-medium">我的积分</p>
+              <p className="text-sm text-white/80">积分换时长，行为换奖励</p>
+            </div>
+            <span className="text-2xl">→</span>
+          </div>
+        </button>
+      </div>
+
       {/* 用户信息入口 */}
       <div className="mx-4 mt-4 bg-white rounded-2xl shadow-sm overflow-hidden">
         <button
