@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { checkNotExpired } from "@/lib/auth-utils";
 import { withErrorHandler, errors } from "@/lib/api-error";
+import { earnPoints, hasChildren } from "@/lib/points";
 
 // GET /api/children - 获取用户的孩子列表
 export const GET = withErrorHandler(async (req: NextRequest) => {
@@ -39,6 +40,9 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     throw errors.badRequest("name, gender and birthDate required");
   }
 
+  // 首次添加孩子获得积分（需在创建之前检查）
+  const alreadyHasChildren = await hasChildren(auth.userId);
+
   const child = await prisma.child.create({
     data: {
       userId: auth.userId,
@@ -54,6 +58,11 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
       createdAt: true,
     },
   });
+
+  // 首次添加孩子获得积分
+  if (!alreadyHasChildren) {
+    await earnPoints(auth.userId, 'firstChild', child.id, '首次添加孩子');
+  }
 
   return NextResponse.json({ code: 0, data: child });
 });
