@@ -46,8 +46,9 @@ export async function checkNotExpired(req: NextRequest): Promise<AuthResult | Ne
 
   // 动态导入避免循环依赖
   const { isExpired } = await import('./user-expiry');
+  const expiryStatus = await isExpired(auth.userId);
 
-  if (await isExpired(auth.userId)) {
+  if (expiryStatus.expired) {
     // 查询用户状态，区分 pending 和普通过期
     const { prisma } = await import('@/lib/prisma');
     const user = await prisma.user.findUnique({
