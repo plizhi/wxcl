@@ -22,39 +22,46 @@ export type MedalType = typeof MEDAL_TYPES[keyof typeof MEDAL_TYPES];
  * 获取用户的所有勋章
  */
 export async function getUserMedals(userId: string): Promise<Badge[]> {
-  // 查询该用户所有 ApplyReward 中 medal=true 的记录
-  const rewards = await prisma.applyReward.findMany({
-    where: {
-      medal: true,
-      apply: {
-        userId: userId,
-      },
-    },
-    include: {
-      apply: {
-        select: {
-          id: true,
-          shareCode: true,
+  console.log('[medal.ts] getUserMedals called with userId:', userId);
+  try {
+    // 查询该用户所有 ApplyReward 中 medal=true 的记录
+    // 需要通过 Apply 表关联
+    const rewards = await prisma.applyReward.findMany({
+      where: {
+        medal: true,
+        apply: {
+          userId: userId,
         },
       },
-    },
-    orderBy: {
-      createdAt: 'desc',
-    },
-  });
+      include: {
+        apply: {
+          select: {
+            id: true,
+            shareCode: true,
+          },
+        },
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
 
-  return rewards.map((reward) => {
-    const medalInfo = reward.type === 'opens'
-      ? MEDAL_TYPES.WEEK_OPENS_CHAMPION
-      : MEDAL_TYPES.WEEK_USERS_CHAMPION;
+    return rewards.map((reward) => {
+      const medalInfo = reward.type === 'opens'
+        ? MEDAL_TYPES.WEEK_OPENS_CHAMPION
+        : MEDAL_TYPES.WEEK_USERS_CHAMPION;
 
-    return {
-      code: `${medalInfo.code}_${reward.apply.shareCode.slice(-4)}`,
-      name: medalInfo.name,
-      icon: medalInfo.icon,
-      period: reward.period,
-      rank: reward.rank,
-      earnedAt: reward.createdAt.toISOString(),
-    };
-  });
+      return {
+        code: `${medalInfo.code}_${reward.apply.shareCode.slice(-4)}`,
+        name: medalInfo.name,
+        icon: medalInfo.icon,
+        period: reward.period,
+        rank: reward.rank,
+        earnedAt: reward.createdAt.toISOString(),
+      };
+    });
+  } catch (error) {
+    console.error('[medal.ts] Error:', error);
+    throw error;
+  }
 }

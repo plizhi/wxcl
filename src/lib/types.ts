@@ -89,6 +89,9 @@ export interface Badge {
   code: string;
   name: string;
   icon: string;
+  period?: string;
+  rank?: number;
+  earnedAt?: string;
   progress?: number;
   total?: number;
 }

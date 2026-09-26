@@ -345,6 +345,7 @@ model Apply {
   createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamp
 
   user        User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+  rewards     ApplyReward[]
 
   @@index([referrerId])
   @@index([userId])
@@ -373,6 +374,8 @@ model ApplyReward {
   rewardCode String?  @map("reward_code") @db.VarChar(8)
   medal      Boolean  @default(false)  // 是否发放电子勋章
   createdAt  DateTime @default(now()) @map("created_at") @db.Timestamp
+
+  apply      Apply    @relation(fields: [applyId], references: [id], onDelete: Cascade)
 
   @@unique([applyId, period, type])
   @@index([applyId])
