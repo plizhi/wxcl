@@ -21,6 +21,7 @@ enum Intent {
   daily
   emergency
   nourishment
+  venting
 }
 
 enum Source {
