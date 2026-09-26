@@ -63,12 +63,15 @@ model User {
   expireAt   DateTime?  @map("expire_at") @db.Timestamp  // 到期时间，null表示无限制
   status     String    @default("active") @map("status") @db.VarChar(20)  // pending=待激活, active=已激活
   source     String    @default("organic") @map("source") @db.VarChar(20)  // nzyy=从nzyy跳转, organic=直接访问
+  points     Int       @default(0) @map("points")  // 积分余额
   createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamp
   updatedAt  DateTime  @updatedAt @map("updated_at") @db.Timestamp
+  portalUserId String?  @map("portal_user_id") @db.VarChar(64) @unique
 
   children     Child[]
   apply       Apply?
   activities   UserActivity[]
+  pointTx     PointTransaction[]
 
   @@map("users")
 }
@@ -373,4 +376,24 @@ model ApplyReward {
   @@unique([applyId, period, type])
   @@index([applyId])
   @@map("apply_rewards")
+}
+
+// ========== 积分系统 ==========
+
+// 积分流水
+model PointTransaction {
+  id          String   @id @default(cuid())
+  userId      String   @map("user_id") @db.Uuid
+  type        String   @db.VarChar(30)  // earn_record/earn_nourishment/earn_vent/earn_reflection/earn_report/earn_share/earn_invite/earn_profile/earn_child/redeem/expire
+  amount      Int      // 正=获得, 负=消耗
+  balance     Int      // 变动后余额
+  description String?  @db.VarChar(200)
+  relatedId   String?  // 关联记录ID
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamp
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([createdAt])
+  @@map("point_transactions")
 }
