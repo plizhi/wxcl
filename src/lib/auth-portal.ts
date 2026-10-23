@@ -1,14 +1,26 @@
 import { createRemoteJWKSet, jwtVerify, JWTPayload } from 'jose';
 import { prisma } from '@/lib/prisma';
 
-const AUTH_BASE     = process.env.AUTH_BASE_URL!;
+const AUTH_BASE     = process.env.AUTH_BASE_URL;
 const CLIENT_ID     = process.env.CLIENT_ID! || 'wxcl';
 const CLIENT_SECRET = process.env.CLIENT_WXCL_SECRET!;
 const REDIRECT_URI  = process.env.WXCL_REDIRECT_URI!;
 const JWT_ISSUER   = process.env.JWT_ISSUER!;
 
-// JWKS 远程公钥集，jose 自动缓存 + 按 kid 轮换
-const JWKS = createRemoteJWKSet(new URL(`${AUTH_BASE}/.well-known/jwks.json`));
+// 惰性创建：模块加载时若 AUTH_BASE_URL 缺失就 new URL 会直接抛错，
+// 导致任何 import 本模块的地方（测试、CI）都崩
+let jwks: ReturnType<typeof createRemoteJWKSet> | null = null;
+function requireAuthBase(): string {
+  if (!AUTH_BASE) throw new Error('AUTH_BASE_URL 未配置');
+  return AUTH_BASE;
+}
+function getJwks() {
+  if (!jwks) {
+    // JWKS 远程公钥集，jose 自动缓存 + 按 kid 轮换
+    jwks = createRemoteJWKSet(new URL(`${requireAuthBase()}/.well-known/jwks.json`));
+  }
+  return jwks;
+}
 
 export interface PortalPayload extends JWTPayload {
   sub: string;
@@ -18,7 +30,7 @@ export interface PortalPayload extends JWTPayload {
 
 // ---------- 新 token 验证：本地 RS256 验签，不依赖网络 ----------
 export async function verifyPortalToken(accessToken: string): Promise<PortalPayload> {
-  const { payload } = await jwtVerify(accessToken, JWKS, { issuer: JWT_ISSUER });
+  const { payload } = await jwtVerify(accessToken, getJwks(), { issuer: JWT_ISSUER });
   return payload as PortalPayload;
 }
 
@@ -28,7 +40,7 @@ export async function exchangeCode(code: string): Promise<{
   refresh_token: string;
   expires_in: number;
 }> {
-  const res = await fetch(`${AUTH_BASE}/oauth/token`, {
+  const res = await fetch(`${requireAuthBase()}/oauth/token`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
@@ -49,7 +61,7 @@ export async function fetchUserInfo(accessToken: string): Promise<{
   phone: string | null;
   nickname: string | null;
 }> {
-  const res = await fetch(`${AUTH_BASE}/oauth/userinfo`, {
+  const res = await fetch(`${requireAuthBase()}/oauth/userinfo`, {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
   if (!res.ok) throw new Error(`userinfo failed: ${res.status}`);
