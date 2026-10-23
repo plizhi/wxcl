@@ -58,14 +58,14 @@ export async function fetchUserInfo(accessToken: string): Promise<{
 
 // ---------- 绑定/创建本地用户 ----------
 export async function bindOrCreateUser(portal: {
-  unionId: string;
+  portal_user_id: string;
   phone: string | null;
   nickname: string | null;
 }) {
   // 优先按 portalUserId 命中（已绑定过的老用户）
-  if (portal.unionId) {
+  if (portal.portal_user_id) {
     const existing = await prisma.user.findUnique({
-      where: { portalUserId: portal.unionId },
+      where: { portalUserId: portal.portal_user_id },
     });
     if (existing) return existing;
   }
@@ -78,7 +78,7 @@ export async function bindOrCreateUser(portal: {
     if (byPhone) {
       return prisma.user.update({
         where: { id: byPhone.id },
-        data: { portalUserId: portal.unionId },
+        data: { portalUserId: portal.portal_user_id },
       });
     }
   }
@@ -89,7 +89,7 @@ export async function bindOrCreateUser(portal: {
       phone:       portal.phone ?? null,
       password:    '',          // 本地不再使用密码
       nickname:    portal.nickname ?? '用户',
-      portalUserId: portal.unionId,
+      portalUserId: portal.portal_user_id,
     },
   });
 }

@@ -1,4 +1,4 @@
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getAuthFromRequest } from "@/lib/auth-utils";
 import { withErrorHandler, errors } from "@/lib/api-error";
@@ -60,7 +60,7 @@ export const GET = withErrorHandler(async (req: NextRequest) => {
     take: 20,
   });
 
-  return { code: 0, message: "成功", data: { reports } };
+  return NextResponse.json({ code: 0, message: "成功", data: { reports } });
 });
 
 export const POST = withErrorHandler(async (req: NextRequest) => {
@@ -171,5 +171,5 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     },
   });
 
-  return { code: 0, message: "成功", data: { report } };
+  return NextResponse.json({ code: 0, message: "成功", data: { report } });
 });

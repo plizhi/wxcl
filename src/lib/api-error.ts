@@ -16,8 +16,8 @@ export class ApiError extends Error {
 }
 
 export const errors = {
-  unauthorized: () => new ApiError(401, 401, "未登录"),
-  forbidden: () => new ApiError(403, 403, "无权访问"),
+  unauthorized: (msg = "未登录") => new ApiError(401, 401, msg),
+  forbidden: (msg = "无权访问") => new ApiError(403, 403, msg),
   notFound: (msg = "资源不存在") => new ApiError(404, 404, msg),
   badRequest: (msg = "请求参数错误") => new ApiError(400, 400, msg),
   serverError: (msg = "服务器错误") => new ApiError(500, 500, msg),

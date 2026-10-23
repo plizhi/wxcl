@@ -1,4 +1,4 @@
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getAuthFromRequest } from "@/lib/auth-utils";
 import { callAI, parseAIResponse } from "@/lib/ai";
@@ -96,7 +96,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   });
 
   if (records.length === 0) {
-    return { extractions: [], message: "没有新的记录需要提取" };
+    return NextResponse.json({ extractions: [], message: "没有新的记录需要提取" });
   }
 
   const extractions: { fact: string; feeling: string; level: string; recordId: string }[] = [];
@@ -150,9 +150,9 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     }
   }
 
-  return {
+  return NextResponse.json({
     extractions,
     savedCount,
     processedRecords: records.length,
-  };
+  });
 });

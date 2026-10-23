@@ -1,7 +1,6 @@
 export const runtime = 'nodejs';
 
 import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
 import { generateToken } from '@/lib/auth';
 import { exchangeCode, fetchUserInfo, bindOrCreateUser, verifyPortalToken } from '@/lib/auth-portal';
 
@@ -31,8 +30,8 @@ export async function GET(request: Request) {
     const userinfo = await fetchUserInfo(tokens.access_token);
 
     // ④ 绑定或创建本地用户
-    const user = await bindOrCreateUser(prisma, {
-      portalUserId: userinfo.portal_user_id,
+    const user = await bindOrCreateUser({
+      portal_user_id: userinfo.portal_user_id,
       phone:   userinfo.phone,
       nickname: userinfo.nickname,
     });

@@ -23,6 +23,7 @@ export const GET = withErrorHandler(async (req: NextRequest) => {
         id: true,
         content: true,
         reply: true,
+        intent: true,
         createdAt: true,
       },
       orderBy: { createdAt: "desc" },
