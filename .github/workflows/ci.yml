@@ -1,0 +1,47 @@
+name: CI
+
+on:
+  push:
+    branches: [dev-work, master]
+  pull_request:
+    branches: [dev-work, master]
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - run: npm ci
+
+      - name: prisma generate
+        run: npx prisma generate
+        env:
+          DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
+
+      - name: typecheck
+        run: npx tsc --noEmit
+
+      - name: test
+        run: npm test
+
+      # next.config 已关闭 ignoreBuildErrors，类型错误会直接让构建失败
+      - name: build
+        run: npm run build
+        env:
+          DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
+          JWT_SECRET: ci-dummy-secret-not-for-production
+          DEEPSEEK_API_KEY: ci-dummy
+          ADMIN_SECRET: ci-dummy
+          CRON_SECRET: ci-dummy
+          NZYY_API_URL: https://nzyy.cc/api
+          AUTH_BASE_URL: https://auth.nzyy.ltd
+          CLIENT_ID: wxcl-dev
+          CLIENT_WXCL_SECRET: ci-dummy
+          WXCL_REDIRECT_URI: https://wxcl.nzyy.ltd/api/auth/callback
+          JWT_ISSUER: https://auth.nzyy.ltd
