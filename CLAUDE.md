@@ -65,7 +65,7 @@ npm run dev
 
 # PM2 生产模式部署（测试用）
 npm run build
-pm2 reload ecosystem.config.js --only wxcl-v2-dev
+pm2 restart wxcl-v2-dev
 
 # 推送代码
 git push origin dev-work
@@ -127,13 +127,15 @@ wxcl-v2-dev  → /home/pupeng/projects/wxcl-v2-dev  → dev-work 分支（开发
 
 ### PM2 部署配置
 
-ecosystem.config.cjs 使用 `next start -p <PORT>`。
+本机所有实例的启动配置**统一在 `/home/pupeng/projects/deploy/ecosystem.config.js`**，各项目仓库里不再放 ecosystem 文件。
 
----
+```bash
+cd /home/pupeng/projects/deploy
+pm2 restart wxcl-v2-dev   # 重启单个实例（最常用）
+pm2 save                  # 刷新 dump.pm2，重启机器后靠它恢复
+```
 
-## PM2 部署配置
-
-ecosystem.config.js 使用 `next start -p 3011`。
+新增应用或改端口，都改那个目录里的配置。
 
 ### error.tsx 兜底机制
 
