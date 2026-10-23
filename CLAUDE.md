@@ -43,8 +43,8 @@
 
 | 项目 | 值 |
 |------|-----|
-| 端口 | 3008 |
-| 访问 URL | http://wxcl.nzyy.ltd |
+| 端口 | 3011 |
+| 访问 URL | https://wxcl.nzyy.ltd |
 | 分支 | dev-work |
 | 数据库 | PostgreSQL wxcl_dev |
 | 测试账号 | 13800138000 |
@@ -80,11 +80,60 @@ git push origin dev-work
 - 代码修改后 commit 并 push 到 dev-work 分支
 - 生产部署需要切换到 wxcl-v2 目录执行部署流程
 
+## 操作红线
+
+**禁止在生产环境进行代码修改！**
+- 所有代码开发必须在 `/home/pupeng/projects/wxcl-v2-dev` 进行
+- 测试通过后，git push 到 dev-work 分支
+- 再切换到生产环境 pull 并部署
+- 违反此规则属于严重失误
+
+## 当前进度
+
+### 积分体系开发中（2026-09-26）
+
+**已完成：**
+- 数据库设计：User.points 字段、PointTransaction 表
+- 积分服务：src/lib/points.ts
+- 积分 API：/api/user/points、/api/user/points/history、/api/user/points/redeem
+- 行为触发点：记录、滋养时刻、压力吐槽、家长反思、全景报告、分享点击、邀请注册、添加孩子、完善画像
+
+**待完成：**
+- 前端积分展示页面
+- 积分兑换 UI
+- 数据库更新：`npx prisma db push --accept-data-loss`（未执行）
+- 生产部署
+
+---
+
+## 部署架构（2026-09-22）
+
+### 服务端口映射
+
+| 域名 | 端口 | PM2 进程 | 代码分支 |
+|------|------|----------|----------|
+| lzti.nzyy.ltd | 3010 | lzti-dev | dev-work |
+| lzti.nzyy.cc | 3000 | lzti | master |
+| wxcl.nzyy.ltd | 3011 | wxcl-v2-dev | dev-work |
+| wxcl.nzyy.cc | 3006 | wxcl-v2 | master |
+| nzyy.cc | 3009 | nzyy | master |
+
+### Worktree 架构
+
+```
+wxcl-v2      → /home/pupeng/projects/wxcl-v2      → master 分支（生产）
+wxcl-v2-dev  → /home/pupeng/projects/wxcl-v2-dev  → dev-work 分支（开发）
+```
+
+### PM2 部署配置
+
+ecosystem.config.cjs 使用 `next start -p <PORT>`。
+
 ---
 
 ## PM2 部署配置
 
-ecosystem.config.js 使用 `next start -p 3008`，与生产环境完全一致。
+ecosystem.config.js 使用 `next start -p 3011`。
 
 ### error.tsx 兜底机制
 
@@ -100,7 +149,7 @@ ecosystem.config.js 使用 `next start -p 3008`，与生产环境完全一致。
 1. `pkill -f "next-server"` 杀掉所有 next 进程
 2. `rm -rf .next` 清理缓存
 3. `npm run build` 构建
-4. 服务器自动在 3008 端口启动
+4. 服务器自动在 3011 端口启动
 
 **注意：** dev 模式有 Turbopack 缓存问题，加载慢或卡住时用 build 模式测试。
 
