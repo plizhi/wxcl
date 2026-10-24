@@ -7,6 +7,8 @@ const CLIENT_SECRET = process.env.CLIENT_WXCL_SECRET!;
 const REDIRECT_URI  = process.env.WXCL_REDIRECT_URI!;
 const JWT_ISSUER   = process.env.JWT_ISSUER!;
 
+export { AUTH_BASE, CLIENT_ID, CLIENT_SECRET, REDIRECT_URI, JWT_ISSUER };
+
 // 惰性创建：模块加载时若 AUTH_BASE_URL 缺失就 new URL 会直接抛错，
 // 导致任何 import 本模块的地方（测试、CI）都崩
 let jwks: ReturnType<typeof createRemoteJWKSet> | null = null;
