@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getAuthFromRequest } from "@/lib/auth-utils";
+import { checkNotExpired } from "@/lib/auth-utils";
 import { callAI, parseAIResponse } from "@/lib/ai";
 import { withErrorHandler, errors } from "@/lib/api-error";
 import { earnPoints } from "@/lib/points";
@@ -57,8 +57,9 @@ export const GET = withErrorHandler(async (req: NextRequest) => {
   const startDate = searchParams.get("startDate") || undefined;
   const endDate = searchParams.get("endDate") || undefined;
 
-  const auth = getAuthFromRequest(req);
-  if (!auth) throw errors.unauthorized();
+  const authOrRes = await checkNotExpired(req);
+  if (authOrRes instanceof NextResponse) return authOrRes;
+  const auth = authOrRes;
 
   const userId = auth.userId;
 

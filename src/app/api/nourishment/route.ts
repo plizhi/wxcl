@@ -1,6 +1,6 @@
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getAuthFromRequest } from "@/lib/auth-utils";
+import { checkNotExpired } from "@/lib/auth-utils";
 import { withErrorHandler, errors } from "@/lib/api-error";
 import { apiSuccess } from "@/lib/response";
 import { earnPoints } from "@/lib/points";
@@ -23,10 +23,9 @@ async function validateChildId(userId: string, childId: string): Promise<boolean
 }
 
 export const GET = withErrorHandler(async (req: NextRequest) => {
-  const auth = getAuthFromRequest(req);
-  if (!auth) {
-    throw errors.unauthorized();
-  }
+  const authOrRes = await checkNotExpired(req);
+  if (authOrRes instanceof NextResponse) return authOrRes;
+  const auth = authOrRes;
 
   let childId = req.nextUrl.searchParams.get("childId");
   if (!childId) {
@@ -67,10 +66,9 @@ export const GET = withErrorHandler(async (req: NextRequest) => {
 });
 
 export const POST = withErrorHandler(async (req: NextRequest) => {
-  const auth = getAuthFromRequest(req);
-  if (!auth) {
-    throw errors.unauthorized();
-  }
+  const authOrRes = await checkNotExpired(req);
+  if (authOrRes instanceof NextResponse) return authOrRes;
+  const auth = authOrRes;
 
   let { childId, fact, feeling, source = "manual", extractedFromRecordId } = await req.json();
 

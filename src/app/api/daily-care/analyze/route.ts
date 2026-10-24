@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getAuthFromRequest } from "@/lib/auth-utils";
+import { checkNotExpired } from "@/lib/auth-utils";
 import { callAI, parseAIResponse } from "@/lib/ai";
 import { DailyCareReport } from "@/lib/types";
 import { withErrorHandler, errors } from "@/lib/api-error";
@@ -237,8 +237,9 @@ function buildPromptWithHistory(
 }
 
 export const POST = withErrorHandler(async (req: NextRequest) => {
-  const auth = getAuthFromRequest(req);
-  if (!auth) throw errors.unauthorized();
+  const authOrRes = await checkNotExpired(req);
+  if (authOrRes instanceof NextResponse) return authOrRes;
+  const auth = authOrRes;
 
   const { content, childId: requestedChildId, intent = "daily", parentRole } = await req.json();
 

@@ -1,13 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAuthFromRequest } from '@/lib/auth-utils';
+import { checkNotExpired } from '@/lib/auth-utils';
 import { prisma } from '@/lib/prisma';
 
 export const GET = async (req: NextRequest) => {
   try {
-    const auth = getAuthFromRequest(req);
-    if (!auth) {
-      return NextResponse.json({ code: 401, message: '未登录' }, { status: 401 });
-    }
+    const authOrRes = await checkNotExpired(req);
+    if (authOrRes instanceof NextResponse) return authOrRes;
+    const auth = authOrRes;
 
     const rewards = await prisma.applyReward.findMany({
       where: {

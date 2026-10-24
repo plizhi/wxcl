@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getAuthFromRequest } from "@/lib/auth-utils";
+import { checkNotExpired } from "@/lib/auth-utils";
 import { withErrorHandler, errors } from "@/lib/api-error";
 
 // GET /api/daily-care/report/[id]
@@ -8,8 +8,9 @@ export const GET = withErrorHandler(async (
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) => {
-  const auth = getAuthFromRequest(req);
-  if (!auth) throw errors.unauthorized();
+  const authOrRes = await checkNotExpired(req);
+  if (authOrRes instanceof NextResponse) return authOrRes;
+  const auth = authOrRes;
   const userId = auth.userId;
   const { id } = await params;
 

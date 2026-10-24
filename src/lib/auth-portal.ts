@@ -1,5 +1,6 @@
 import { createRemoteJWKSet, jwtVerify, JWTPayload } from 'jose';
 import { prisma } from '@/lib/prisma';
+import { addMonths, INITIAL_MONTHS } from '@/lib/user-expiry';
 
 const AUTH_BASE     = process.env.AUTH_BASE_URL;
 const CLIENT_ID     = process.env.CLIENT_ID! || 'wxcl';
@@ -70,12 +71,30 @@ export async function fetchUserInfo(accessToken: string): Promise<{
   return res.json();
 }
 
+// ---------- 手机号归一化 ----------
+// auth-dev 统一存 +86，本地库存 11 位。匹配前必须归一化，
+// 否则同一个自然人会被当成两个账户（存量用户永远匹配不上）。
+export function normalizePhone(phone: string | null | undefined): string | null {
+  if (!phone) return null;
+  const digits = phone.replace(/\D/g, '');
+  if (digits.length === 13 && digits.startsWith('86')) return digits.slice(2);
+  if (digits.length === 11 && digits.startsWith('1')) return digits;
+  return digits || null;
+}
+
+// SSO 直接注册的用户起步时长。普通用户靠邀请码换 6 个月，
+// SSO 用户没有拉新曝光，起点时长相应降低，之后靠分享/邀请/反馈增长。
+export const SSO_INITIAL_MONTHS = 3;
+
 // ---------- 绑定/创建本地用户 ----------
+// 原则：账号打通只证明「是谁」，身份与时长一律以本地规则为准。
 export async function bindOrCreateUser(portal: {
   portal_user_id: string;
   phone: string | null;
   nickname: string | null;
 }) {
+  const phone = normalizePhone(portal.phone);
+
   // 优先按 portalUserId 命中（已绑定过的老用户）
   if (portal.portal_user_id) {
     const existing = await prisma.user.findUnique({
@@ -84,10 +103,10 @@ export async function bindOrCreateUser(portal: {
     if (existing) return existing;
   }
 
-  // 按 phone 匹配存量用户 → 自动绑定（39 人的主路径）
-  if (portal.phone) {
+  // 按归一化手机号匹配存量用户 → 只补绑定，不动其身份与时长
+  if (phone) {
     const byPhone = await prisma.user.findUnique({
-      where: { phone: portal.phone },
+      where: { phone },
     });
     if (byPhone) {
       return prisma.user.update({
@@ -97,13 +116,32 @@ export async function bindOrCreateUser(portal: {
     }
   }
 
-  // 全新用户 → 创建（无密码，凭证完全托管给 auth）
-  return prisma.user.create({
+  // 全新用户
+  // 若此前在 wxcl 预注册过（有 Apply），保留其分享码与归属，
+  // 且属于被推荐来源，起步时长与普通注册用户一致
+  const apply = phone
+    ? await prisma.apply.findUnique({ where: { phone } })
+    : null;
+  const months = apply?.referrerId ? INITIAL_MONTHS : SSO_INITIAL_MONTHS;
+
+  const user = await prisma.user.create({
     data: {
-      phone:       portal.phone ?? null,
-      password:    '',          // 本地不再使用密码
-      nickname:    portal.nickname ?? '用户',
+      phone,
+      password:    null,        // 密码未设置前不可密码登录（登录接口会挡住空密码）
+      nickname:    portal.nickname || '用户',
       portalUserId: portal.portal_user_id,
+      source:      'sso',
+      expireAt:    addMonths(new Date(), months),
     },
   });
+
+  // 关联既有 Apply：激活并绑定账户，归属不丢
+  if (apply && !apply.userId) {
+    await prisma.apply.update({
+      where: { id: apply.id },
+      data: { status: 'activated', userId: user.id, activatedAt: new Date() },
+    });
+  }
+
+  return user;
 }

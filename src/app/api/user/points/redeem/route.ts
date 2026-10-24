@@ -1,22 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getTokenFromHeader, verifyToken } from '@/lib/auth';
+import { checkNotExpired } from '@/lib/auth-utils';
 import { redeemPoints } from '@/lib/points';
 import { withErrorHandler } from '@/lib/api-error';
 
 export const POST = withErrorHandler(async (req: NextRequest) => {
-  const token = getTokenFromHeader(req.headers.get('Authorization'));
-  if (!token) {
-    return NextResponse.json({ code: 401, message: '未登录' }, { status: 401 });
-  }
-
-  const payload = verifyToken(token);
-  if (!payload) {
-    return NextResponse.json({ code: 401, message: '无效的token' }, { status: 401 });
-  }
+  const authOrRes = await checkNotExpired(req);
+  if (authOrRes instanceof NextResponse) return authOrRes;
+  const auth = authOrRes;
 
   const { redeemType } = await req.json();
 
-  const result = await redeemPoints(payload.userId, redeemType);
+  const result = await redeemPoints(auth.userId, redeemType);
 
   if (!result.success) {
     return NextResponse.json({

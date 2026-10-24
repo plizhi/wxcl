@@ -36,8 +36,8 @@ export async function GET(request: NextRequest) {
       nickname: userinfo.nickname,
     });
 
-    // ⑤ 签发本地会话
-    const localToken = generateToken({ userId: user.id, phone: userinfo.phone ?? '' });
+    // ⑤ 签发本地会话（手机号用库里的归一化值，不直接用 auth 返回的 +86 格式）
+    const localToken = generateToken({ userId: user.id, phone: user.phone ?? '' });
 
     // 反代后 request.url 的 origin 是内网地址（localhost:3011），
     // 跳转目标必须用对外域名

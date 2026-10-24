@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getAuthFromRequest } from "@/lib/auth-utils";
+import { checkNotExpired } from "@/lib/auth-utils";
 import { callAI, parseAIResponse } from "@/lib/ai";
 import { withErrorHandler, errors } from "@/lib/api-error";
 
@@ -57,8 +57,9 @@ async function validateChildId(userId: string, childId: string): Promise<boolean
 
 // POST /api/daily-care/batch - 批量导入回忆记录
 export const POST = withErrorHandler(async (req: NextRequest) => {
-  const auth = getAuthFromRequest(req);
-  if (!auth) throw errors.unauthorized();
+  const authOrRes = await checkNotExpired(req);
+  if (authOrRes instanceof NextResponse) return authOrRes;
+  const auth = authOrRes;
 
   const { records, childId: requestedChildId } = await req.json();
 

@@ -1,13 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getAuthFromRequest } from "@/lib/auth-utils";
+import { checkNotExpired } from "@/lib/auth-utils";
 import { withErrorHandler, errors } from "@/lib/api-error";
 
 export const GET = withErrorHandler(async (req: NextRequest) => {
-  const auth = getAuthFromRequest(req);
-  if (!auth) {
-    throw errors.unauthorized();
-  }
+  const authOrRes = await checkNotExpired(req);
+  if (authOrRes instanceof NextResponse) return authOrRes;
+  const auth = authOrRes;
 
   const { searchParams } = new URL(req.url);
   const childId = searchParams.get("childId");
@@ -47,10 +46,9 @@ export const GET = withErrorHandler(async (req: NextRequest) => {
 });
 
 export const PATCH = withErrorHandler(async (req: NextRequest) => {
-  const auth = getAuthFromRequest(req);
-  if (!auth) {
-    throw errors.unauthorized();
-  }
+  const authOrRes = await checkNotExpired(req);
+  if (authOrRes instanceof NextResponse) return authOrRes;
+  const auth = authOrRes;
 
   const { opportunityId, status } = await req.json();
 

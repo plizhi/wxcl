@@ -1,18 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getTokenFromHeader, verifyToken } from "@/lib/auth";
+import { checkNotExpired } from "@/lib/auth-utils";
 import { withErrorHandler, errors } from "@/lib/api-error";
 import { earnPoints } from "@/lib/points";
 
 // GET /api/records?childId=xxx - 获取孩子的陪伴记录
 export const GET = withErrorHandler(async (req: NextRequest) => {
-  const authHeader = req.headers.get("authorization");
-  const token = getTokenFromHeader(authHeader);
-  const auth = token ? verifyToken(token) : null;
-
-  if (!auth) {
-    throw errors.unauthorized();
-  }
+  const authOrRes = await checkNotExpired(req);
+  if (authOrRes instanceof NextResponse) return authOrRes;
+  const auth = authOrRes;
 
   const childId = req.nextUrl.searchParams.get("childId");
 
@@ -48,13 +44,9 @@ export const GET = withErrorHandler(async (req: NextRequest) => {
 
 // POST /api/records - 创建陪伴记录
 export const POST = withErrorHandler(async (req: NextRequest) => {
-  const authHeader = req.headers.get("authorization");
-  const token = getTokenFromHeader(authHeader);
-  const auth = token ? verifyToken(token) : null;
-
-  if (!auth) {
-    throw errors.unauthorized();
-  }
+  const authOrRes = await checkNotExpired(req);
+  if (authOrRes instanceof NextResponse) return authOrRes;
+  const auth = authOrRes;
 
   const { childId, content, reply, intent = "daily" } = await req.json();
 
