@@ -3,6 +3,7 @@ export const runtime = 'nodejs';
 import { NextRequest, NextResponse } from 'next/server';
 import { generateToken } from '@/lib/auth';
 import { exchangeCode, fetchUserInfo, bindOrCreateUser, verifyPortalToken, REDIRECT_URI } from '@/lib/auth-portal';
+import { ApiError } from '@/lib/api-error';
 
 // GET /api/auth/callback
 // 望杏成林账号 SSO 回调：校验 state → 换 token → 取 userinfo → 绑定/创建本地用户
@@ -57,6 +58,10 @@ export async function GET(request: NextRequest) {
     return response;
   } catch (err) {
     console.error('oauth callback error:', err);
+    // 账号冲突（手机号已绑到别的体系账号）要说清楚，别一律报「认证失败」
+    if (err instanceof ApiError) {
+      return NextResponse.json({ error: err.message }, { status: err.status });
+    }
     return NextResponse.json({ error: 'authentication failed' }, { status: 401 });
   }
 }

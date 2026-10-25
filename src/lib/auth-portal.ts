@@ -1,6 +1,7 @@
 import { createRemoteJWKSet, jwtVerify, JWTPayload } from 'jose';
 import { prisma } from '@/lib/prisma';
 import { addMonths, INITIAL_MONTHS } from '@/lib/user-expiry';
+import { errors } from '@/lib/api-error';
 
 const AUTH_BASE     = process.env.AUTH_BASE_URL;
 const CLIENT_ID     = process.env.CLIENT_ID! || 'wxcl';
@@ -9,6 +10,9 @@ const REDIRECT_URI  = process.env.WXCL_REDIRECT_URI!;
 const JWT_ISSUER   = process.env.JWT_ISSUER!;
 
 export { AUTH_BASE, CLIENT_ID, CLIENT_SECRET, REDIRECT_URI, JWT_ISSUER };
+
+// 认证服务不可达时不能把用户请求挂住，否则 auth 抖动 = 注册/登录转圈
+const AUTH_FETCH_TIMEOUT_MS = 10_000;
 
 // 惰性创建：模块加载时若 AUTH_BASE_URL 缺失就 new URL 会直接抛错，
 // 导致任何 import 本模块的地方（测试、CI）都崩
@@ -33,7 +37,12 @@ export interface PortalPayload extends JWTPayload {
 
 // ---------- 新 token 验证：本地 RS256 验签，不依赖网络 ----------
 export async function verifyPortalToken(accessToken: string): Promise<PortalPayload> {
-  const { payload } = await jwtVerify(accessToken, getJwks(), { issuer: JWT_ISSUER });
+  // audience 必须锁定本 client：认证服务对所有 client 用同一个 issuer，
+  // 不锁 audience 的话，别的应用（荔学卷）的 token 也能在这里通过验签。
+  const { payload } = await jwtVerify(accessToken, getJwks(), {
+    issuer: JWT_ISSUER,
+    audience: CLIENT_ID,
+  });
   return payload as PortalPayload;
 }
 
@@ -53,6 +62,7 @@ export async function exchangeCode(code: string): Promise<{
       client_secret:  CLIENT_SECRET,
       redirect_uri:   REDIRECT_URI,
     }),
+    signal: AbortSignal.timeout(AUTH_FETCH_TIMEOUT_MS),
   });
   if (!res.ok) throw new Error(`token exchange failed: ${res.status}`);
   return res.json();
@@ -66,6 +76,7 @@ export async function fetchUserInfo(accessToken: string): Promise<{
 }> {
   const res = await fetch(`${requireAuthBase()}/oauth/userinfo`, {
     headers: { Authorization: `Bearer ${accessToken}` },
+    signal: AbortSignal.timeout(AUTH_FETCH_TIMEOUT_MS),
   });
   if (!res.ok) throw new Error(`userinfo failed: ${res.status}`);
   return res.json();
@@ -109,6 +120,10 @@ export async function bindOrCreateUser(portal: {
       where: { phone },
     });
     if (byPhone) {
+      // 已绑到别的体系账号时不能静默改绑，否则两个账号会互相顶掉
+      if (byPhone.portalUserId && byPhone.portalUserId !== portal.portal_user_id) {
+        throw errors.conflict('该手机号已绑定其他体系账号');
+      }
       return prisma.user.update({
         where: { id: byPhone.id },
         data: { portalUserId: portal.portal_user_id },
