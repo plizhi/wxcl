@@ -1,33 +1,12 @@
-import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
-import { generateCode } from "@/lib/auth";
-import { withErrorHandler, errors } from "@/lib/api-error";
-import { checkRateLimit, rateLimitResponse } from "@/lib/rate-limit";
+import { NextResponse } from "next/server";
+import { withErrorHandler } from "@/lib/api-error";
 
-export const POST = withErrorHandler(async (request: NextRequest) => {
-  const { phone } = await request.json();
-
-  if (!phone || !/^1[3-9]\d{9}$/.test(phone)) {
-    throw errors.badRequest("请输入正确的手机号");
-  }
-
-  // 限流：同一手机号 1次/分钟
-  const limit = checkRateLimit(`send-code:${phone}`, 1, 60 * 1000);
-  if (!limit.allowed) {
-    return rateLimitResponse(limit.resetIn);
-  }
-
-  const code = generateCode();
-  const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
-
-  await prisma.authSession.deleteMany({ where: { phone } });
-  await prisma.authSession.create({
-    data: { phone, code, expiresAt },
-  });
-
+// 短信通道未接入：激活码由管理员在 /admin/codes 发放。
+// 这个端点保留下来是为了不打断可能存在的外部调用，但不再落库，
+// 也不再删除该手机号已有的激活码——那会直接锁死已发码的用户。
+export const POST = withErrorHandler(async () => {
   return NextResponse.json({
     code: 0,
-    message: "验证码已发送",
-    data: { phone },
+    message: "短信验证码未启用，请使用管理员发放的激活码或密码登录",
   });
 });

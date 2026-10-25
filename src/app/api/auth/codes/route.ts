@@ -26,7 +26,10 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
 
   for (let i = 0; i < actualCount; i++) {
     const code = generateCode();
-    const expiresAt = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000);
+    // 通用码不绑定手机号，拿到它的人可以用任意手机号创建账户，
+    // 所以有效期压到 30 天；绑定手机号的码是密码重置码，保持一年。
+    const ttlDays = phone ? 365 : 30;
+    const expiresAt = new Date(Date.now() + ttlDays * 24 * 60 * 60 * 1000);
 
     await prisma.authSession.create({
       data: { phone: phone || "", code, expiresAt },

@@ -122,6 +122,12 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
         throw errors.badRequest("该邀请码已被使用，请使用密码登录");
       }
 
+      // 通用码只能被消费一次。上面的查询不带 used 过滤，这里必须显式拒绝，
+      // 否则已被消费过的通用码仍能用任意手机号创建新账户。
+      if (codeSession.used) {
+        throw errors.badRequest("该邀请码已被使用");
+      }
+
       await prisma.authSession.update({
         where: { id: codeSession.id },
         data: { used: true, phone },
