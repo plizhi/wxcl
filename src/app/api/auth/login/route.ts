@@ -18,7 +18,7 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
 
   const user = await prisma.user.findUnique({
     where: { phone },
-    select: { id: true, password: true, nickname: true },
+    select: { id: true, password: true, nickname: true, phoneVerifiedAt: true },
   });
 
   if (!password) {
@@ -168,10 +168,23 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
         throw errors.badRequest("邀请码无效");
       }
 
+      // 专属码是一次性凭据：用过就作废。
+      // 否则这张一年期有效的码会一直能用来重置这个账号的密码。
+      if (codeSession.used) {
+        throw errors.badRequest("该邀请码已被使用，请使用密码登录");
+      }
+
       const hashedCode = hashPassword(activationCode);
       await prisma.user.update({
         where: { id: user.id },
-        data: { password: hashedCode },
+        // 这张码是管理员核验过归属后发给这个手机号的，所以手机号归属在这里被证明，
+        // 记下证明时间：跨应用的统一凭据只发给这类用户。
+        data: { password: hashedCode, phoneVerifiedAt: user.phoneVerifiedAt ?? new Date() },
+      });
+
+      await prisma.authSession.update({
+        where: { id: codeSession.id },
+        data: { used: true },
       });
 
       const token = generateToken({ userId: user.id, phone });

@@ -68,6 +68,10 @@ model User {
   createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamp
   updatedAt  DateTime  @updatedAt @map("updated_at") @db.Timestamp
   portalUserId String?  @map("portal_user_id") @db.VarChar(64) @unique
+  // 手机号归属已被「绑定手机号的专属激活码」证明过的时间。
+  // 通用码注册时手机号是用户自填的，不算证明，所以这里保持 NULL。
+  // 跨应用统一凭据只发给这类用户。
+  phoneVerifiedAt DateTime? @map("phone_verified_at") @db.Timestamp
 
   children     Child[]
   apply       Apply?

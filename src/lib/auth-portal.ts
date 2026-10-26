@@ -82,6 +82,40 @@ export async function fetchUserInfo(accessToken: string): Promise<{
   return res.json();
 }
 
+// ---------- 申请「设置统一密码」的凭据 ----------
+// 配置与 SSO 入口分开：SSO 入口是否渲染由 AUTH_BASE_URL / WXCL_REDIRECT_URI 决定，
+// 生产刻意不配这两项来关闭入口。统一密码要连认证服务，但不该顺带打开 SSO 入口，
+// 所以生产只配 CREDENTIAL_* 这一组。
+const CREDENTIAL_AUTH_BASE = process.env.CREDENTIAL_AUTH_BASE || AUTH_BASE;
+const CREDENTIAL_CLIENT_ID = process.env.CREDENTIAL_CLIENT_ID || CLIENT_ID;
+const CREDENTIAL_CLIENT_SECRET = process.env.CREDENTIAL_CLIENT_SECRET || CLIENT_SECRET;
+
+// 证明依据固定是 activation_code：只有绑定手机号的专属激活码能证明手机号归属，
+// 通用码注册时手机号是用户自填的，不能拿来申请。
+export async function requestActivationCredential(phone: string): Promise<{
+  activation_url: string;
+  expires_at: string;
+}> {
+  if (!CREDENTIAL_AUTH_BASE || !CREDENTIAL_CLIENT_ID || !CREDENTIAL_CLIENT_SECRET) {
+    throw new Error('统一密码未配置：缺少 CREDENTIAL_AUTH_BASE / CREDENTIAL_CLIENT_ID / CREDENTIAL_CLIENT_SECRET');
+  }
+  const basic = Buffer.from(`${CREDENTIAL_CLIENT_ID}:${CREDENTIAL_CLIENT_SECRET}`).toString('base64');
+  const res = await fetch(`${CREDENTIAL_AUTH_BASE}/internal/invites`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Basic ${basic}`,
+    },
+    body: JSON.stringify({ phone, proof: 'activation_code' }),
+    signal: AbortSignal.timeout(AUTH_FETCH_TIMEOUT_MS),
+  });
+  if (!res.ok) {
+    const detail = await res.text().catch(() => '');
+    throw new Error(`credential request failed: ${res.status} ${detail.slice(0, 200)}`);
+  }
+  return res.json();
+}
+
 // ---------- 手机号归一化 ----------
 // auth-dev 统一存 +86，本地库存 11 位。匹配前必须归一化，
 // 否则同一个自然人会被当成两个账户（存量用户永远匹配不上）。

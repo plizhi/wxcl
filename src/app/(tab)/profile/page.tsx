@@ -21,6 +21,7 @@ export default function ProfilePage() {
   const [showAdd, setShowAdd] = useState(false);
   const [editingChild, setEditingChild] = useState<ChildInfo | null>(null);
   const [showUserEdit, setShowUserEdit] = useState(false);
+  const [canSetUnifiedPassword, setCanSetUnifiedPassword] = useState(false);
   const [showFeedback, setShowFeedback] = useState(false);
   const [feedbackText, setFeedbackText] = useState('');
   const [feedbackLoading, setFeedbackLoading] = useState(false);
@@ -39,6 +40,27 @@ export default function ProfilePage() {
     fetchUserInfo();
     refreshChildren();
   }, [fetchUserInfo, refreshChildren]);
+
+  // 统一密码入口只对「手机号已被专属激活码证明过」的用户显示：
+  // 对其他人它只是一个用不了的按钮，不如不出现
+  useEffect(() => {
+    async function fetchEligibility() {
+      try {
+        const res = await fetch('/api/auth/credential', {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token') || ''}`,
+          },
+        });
+        const data = await res.json();
+        if (data.code === 0) {
+          setCanSetUnifiedPassword(!!data.data.eligible);
+        }
+      } catch {
+        // 查不到就不显示入口，不打扰用户
+      }
+    }
+    fetchEligibility();
+  }, []);
 
   if (isLoading) {
     return (
@@ -295,6 +317,25 @@ export default function ProfilePage() {
           <span className="text-gray-400">→</span>
         </button>
       </div>
+
+      {/* 统一账号密码入口 */}
+      {canSetUnifiedPassword && (
+        <div className="mx-4 mt-4 bg-white rounded-2xl shadow-sm overflow-hidden">
+          <button
+            onClick={() => router.push('/profile/account')}
+            className="w-full flex items-center justify-between px-5 py-4"
+          >
+            <div className="flex items-center gap-3">
+              <span className="text-xl">🌐</span>
+              <div className="text-left">
+                <p className="text-gray-700">统一账号密码</p>
+                <p className="text-xs text-gray-400">一个账号，跨应用通用</p>
+              </div>
+            </div>
+            <span className="text-gray-400">→</span>
+          </button>
+        </div>
+      )}
 
       {/* 意见反馈入口 */}
       <div className="mx-4 mt-4 bg-white rounded-2xl shadow-sm overflow-hidden">
