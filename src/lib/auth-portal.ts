@@ -116,6 +116,34 @@ export async function requestActivationCredential(phone: string): Promise<{
   return res.json();
 }
 
+// ---------- 登记到账号层 ----------
+// 把「这个手机号属于本应用的这个用户」登记到认证中心。
+// 证明依据同样固定是 activation_code：只有绑定手机号的专属激活码能证明手机号归属，
+// 通用码注册时手机号是用户自填的，不能拿来登记。
+export async function requestRegistration(phone: string, sourceUserId: string): Promise<{
+  status: string;
+  portal_user_id?: string;
+}> {
+  if (!CREDENTIAL_AUTH_BASE || !CREDENTIAL_CLIENT_ID || !CREDENTIAL_CLIENT_SECRET) {
+    throw new Error('统一密码未配置：缺少 CREDENTIAL_AUTH_BASE / CREDENTIAL_CLIENT_ID / CREDENTIAL_CLIENT_SECRET');
+  }
+  const basic = Buffer.from(`${CREDENTIAL_CLIENT_ID}:${CREDENTIAL_CLIENT_SECRET}`).toString('base64');
+  const res = await fetch(`${CREDENTIAL_AUTH_BASE}/internal/registrations`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Basic ${basic}`,
+    },
+    body: JSON.stringify({ phone, sourceUserId, proof: 'activation_code' }),
+    signal: AbortSignal.timeout(AUTH_FETCH_TIMEOUT_MS),
+  });
+  if (!res.ok) {
+    const detail = await res.text().catch(() => '');
+    throw new Error(`registration failed: ${res.status} ${detail.slice(0, 200)}`);
+  }
+  return res.json();
+}
+
 // ---------- 手机号归一化 ----------
 // auth-dev 统一存 +86，本地库存 11 位。匹配前必须归一化，
 // 否则同一个自然人会被当成两个账户（存量用户永远匹配不上）。

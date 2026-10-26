@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { generateToken, verifyPassword, hashPassword } from "@/lib/auth";
 import { withErrorHandler, errors } from "@/lib/api-error";
 import { initializeNewUser, unfreezeByInvite, recordActivity } from "@/lib/user-expiry";
+import { triggerRegistration } from "@/lib/account-registration";
 import crypto from "crypto";
 
 function generateShareCode(): string {
@@ -18,7 +19,7 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
 
   const user = await prisma.user.findUnique({
     where: { phone },
-    select: { id: true, password: true, nickname: true, phoneVerifiedAt: true },
+    select: { id: true, phone: true, password: true, nickname: true, phoneVerifiedAt: true, portalUserId: true },
   });
 
   if (!password) {
@@ -187,6 +188,14 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
         data: { used: true },
       });
 
+      // 手机号归属刚被证明，顺带登记到账号层，让跨应用登录有落点。
+      triggerRegistration({
+        id: user.id,
+        phone: user.phone,
+        phoneVerifiedAt: user.phoneVerifiedAt ?? new Date(),
+        portalUserId: user.portalUserId,
+      });
+
       const token = generateToken({ userId: user.id, phone });
       return NextResponse.json({
         code: 0,
@@ -207,6 +216,15 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
   await prisma.user.update({
     where: { id: user.id },
     data: { lastLoginAt: new Date() },
+  });
+
+  // 存量用户在此补登：手机号归属已被专属码证明过、但账号层还没有记录的用户，
+  // 登录时补一次（幂等）。没绑定过体系账号才会触发。
+  triggerRegistration({
+    id: user.id,
+    phone: user.phone,
+    phoneVerifiedAt: user.phoneVerifiedAt,
+    portalUserId: user.portalUserId,
   });
 
   const token = generateToken({ userId: user.id, phone });
