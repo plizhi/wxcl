@@ -290,6 +290,28 @@ pm2 save
 
 > **本轮结论：建议一次发 14 张（11 + 3）**，否则这 3 个真人号会卡在门外。签发需朋大大授权。
 
+### 自助开通路径（2026-10-27，提交 `13745ec`）
+
+**问题**：12 个有密码的老用户看不到统一密码入口（eligible=false 时整个入口隐藏），11 个无密码的用户登不进去——两边都只能等管理员挨个发码。
+
+**做法**：把「等 admin」变成「用户自己领」。
+
+| 改动 | 文件 |
+|---|---|
+| 新增「只证明归属、不改密码」的验证接口 | `src/app/api/auth/verify-code/route.ts` |
+| 登录页激活码弹窗加索取引导 | `src/app/login/LoginClient.tsx` |
+| 统一密码入口常驻显示（不再按资格隐藏） | `src/app/(tab)/profile/page.tsx` |
+| 账号页加激活码输入框 + 索取引导 | `src/app/(tab)/profile/account/page.tsx` |
+| 共享联系入口组件（企微二维码 + 邮箱） | `src/components/ContactAdmin.tsx` |
+
+**关键约束**：`verify-code` 的判定逻辑**逐行照抄** login 的专属码分支（只按 `code` 查、再比对手机号），不另起炉灶——两套边界行为不一致迟早出 bug。
+
+**实测结论**（dev 3011）：验证前后密码哈希**逐字节相同**，`phone_verified_at` 写入，资格转正，码作废，原密码仍可登录；别人的码 / 通用码 / 不存在的码 / 未登录均被拒；限速按用户计数生效。
+
+**配置**：`NEXT_PUBLIC_ADMIN_CONTACT_EMAIL=support@nzyy.cc`、`NEXT_PUBLIC_ADMIN_WECOM_IMAGE=/images/wecom.png`（`.env.local`，不入库）。
+
+**顺带修掉**：`profile/account/page.tsx` 有一处模板字符串缺收尾反引号（该文件此前通不过 `tsc`，生产同文件正常）。**教训**：开发目录要整体跑 `npx tsc --noEmit`，光看 build 结果会漏掉语法错误。
+
 ### 剩余待办
 
 | 事项 | 判据 |
