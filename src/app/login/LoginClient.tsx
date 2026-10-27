@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/components/ui/toast';
+import ContactAdmin from '@/components/ContactAdmin';
 
 export default function LoginClient({ ssoEnabled }: { ssoEnabled: boolean }) {
   const router = useRouter();
@@ -103,6 +104,8 @@ export default function LoginClient({ ssoEnabled }: { ssoEnabled: boolean }) {
               >
                 取消
               </button>
+
+              <ContactAdmin title="还没有激活码？" hint="扫码添加客服，领取您的专属激活码" />
             </div>
           </div>
         </div>

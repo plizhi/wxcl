@@ -41,8 +41,9 @@ export default function ProfilePage() {
     refreshChildren();
   }, [fetchUserInfo, refreshChildren]);
 
-  // 统一密码入口只对「手机号已被专属激活码证明过」的用户显示：
-  // 对其他人它只是一个用不了的按钮，不如不出现
+  // 统一密码入口常驻显示，不再按资格隐藏。
+  // 之前 eligible=false 就整个入口消失，12 个有密码的老用户根本不知道有这回事；
+  // 改成始终渲染，进去后账号页会引导「输入激活码开通」。
   useEffect(() => {
     async function fetchEligibility() {
       try {
@@ -56,7 +57,7 @@ export default function ProfilePage() {
           setCanSetUnifiedPassword(!!data.data.eligible);
         }
       } catch {
-        // 查不到就不显示入口，不打扰用户
+        // 查不到资格也不影响入口存在，账号页会自己再查一次
       }
     }
     fetchEligibility();
@@ -319,23 +320,23 @@ export default function ProfilePage() {
       </div>
 
       {/* 统一账号密码入口 */}
-      {canSetUnifiedPassword && (
-        <div className="mx-4 mt-4 bg-white rounded-2xl shadow-sm overflow-hidden">
-          <button
-            onClick={() => router.push('/profile/account')}
-            className="w-full flex items-center justify-between px-5 py-4"
-          >
-            <div className="flex items-center gap-3">
-              <span className="text-xl">🌐</span>
-              <div className="text-left">
-                <p className="text-gray-700">统一账号密码</p>
-                <p className="text-xs text-gray-400">一个账号，跨应用通用</p>
-              </div>
+      <div className="mx-4 mt-4 bg-white rounded-2xl shadow-sm overflow-hidden">
+        <button
+          onClick={() => router.push('/profile/account')}
+          className="w-full flex items-center justify-between px-5 py-4"
+        >
+          <div className="flex items-center gap-3">
+            <span className="text-xl">🌐</span>
+            <div className="text-left">
+              <p className="text-gray-700">统一账号密码</p>
+              <p className="text-xs text-gray-400">
+                {canSetUnifiedPassword ? '一个账号，跨应用通用' : '一个账号，跨应用通用（需激活码开通）'}
+              </p>
             </div>
-            <span className="text-gray-400">→</span>
-          </button>
-        </div>
-      )}
+          </div>
+          <span className="text-gray-400">→</span>
+        </button>
+      </div>
 
       {/* 意见反馈入口 */}
       <div className="mx-4 mt-4 bg-white rounded-2xl shadow-sm overflow-hidden">
