@@ -101,11 +101,16 @@ export const POST = withErrorHandler(async (req: NextRequest, { params }: { para
   }
 
   // 给邀请者记录 invite 行为和积分
+  // 同 login 路由：这是邀请者侧的附带逻辑，失败不该让被邀请者的验证失败。
   if (inviterApply.userId) {
-    await unfreezeByInvite(inviterApply.userId);
-    await recordActivity(inviterApply.userId, 'invite');
-    // 邀请成功获得 +20 积分
-    await earnPoints(inviterApply.userId, 'invite', user.id, '邀请新用户注册');
+    try {
+      await unfreezeByInvite(inviterApply.userId);
+      await recordActivity(inviterApply.userId, 'invite');
+      // 邀请成功获得 +20 积分
+      await earnPoints(inviterApply.userId, 'invite', user.id, '邀请新用户注册');
+    } catch (err) {
+      console.error('[verify-invite] 记录邀请行为失败（不影响本次验证）:', err);
+    }
   }
 
   return apiSuccess({

@@ -150,11 +150,18 @@ export async function recordActivity(userId: string, type: ActivityType): Promis
   let extendMonths: number | undefined;
 
   if (!existing) {
-    // 首次记录
-    await prisma.userActivity.create({
-      data: { userId, type, month, count: 1 },
+    // 首次记录。
+    // 用 upsert 而不是 find-then-create：并发下两个请求可能都查到「不存在」，
+    // 然后都去 create，第二个撞 (userId, type, month) 唯一约束抛 P2002。
+    // upsert 依赖数据库的唯一约束做原子判定，并发下不会报错，
+    // 且 count 的累加在数据库内完成。
+    const { count } = await prisma.userActivity.upsert({
+      where: { userId_type_month: { userId, type, month } },
+      create: { userId, type, month, count: 1 },
+      update: { count: { increment: 1 } },
+      select: { count: true },
     });
-    currentCount = 1;
+    currentCount = count;
   } else {
     // 更新计数
     await prisma.userActivity.update({

@@ -92,9 +92,17 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
       }
 
       // 给邀请者记录 invite 行为（好友成功注册）
+      // 注意：unfreezeByInvite / recordActivity 都是「邀请者侧的附带逻辑」，
+      // 不是本次注册的主流程。万一它们失败（并发写撞唯一约束、DB 抖动），
+      // 不该让被邀请者注册失败——账号已经建好了，只是邀请者少了一次奖励。
+      // 所以这里单独兜住，失败只记日志。
       if (applyInvite.userId) {
-        await unfreezeByInvite(applyInvite.userId);
-        await recordActivity(applyInvite.userId, 'invite');
+        try {
+          await unfreezeByInvite(applyInvite.userId);
+          await recordActivity(applyInvite.userId, 'invite');
+        } catch (err) {
+          console.error('[login] 记录邀请行为失败（不影响本次注册）:', err);
+        }
       }
 
       const token = generateToken({ userId: targetUserId, phone });
