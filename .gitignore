@@ -18,3 +18,6 @@ prisma-next.md
 
 # 本地调试脚本（含硬编码本机路径）
 test-prompt.mjs
+# 本地配置备份副本（含密钥，禁止入库）
+*.bak*
+.env.local.bak*
